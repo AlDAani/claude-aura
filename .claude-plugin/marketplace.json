@@ -1,0 +1,20 @@
+{
+  "name": "claude-good-look",
+  "owner": { "name": "AlDAani", "url": "https://github.com/AlDAani" },
+  "plugins": [
+    {
+      "name": "good-look-flow",
+      "source": "./plugins/good-look-flow",
+      "description": "Skill: plan, delegate to tiered worker subagents, review.",
+      "version": "1.0.0",
+      "category": "skill"
+    },
+    {
+      "name": "good-look-progress",
+      "source": "./plugins/good-look-progress",
+      "description": "Mod: progress bar above the prompt and a live agents panel; made for good-look-flow, shows any subagents.",
+      "version": "1.0.0",
+      "category": "mod"
+    }
+  ]
+}

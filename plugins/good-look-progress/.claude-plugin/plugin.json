@@ -1,0 +1,26 @@
+{
+  "name": "good-look-progress",
+  "version": "1.0.0",
+  "description": "Progress bar above the prompt for /good-look-flow, plus an agents panel (/agents-info): running, finished and planned subagents with model, task progress, context, cost and time.",
+  "author": {
+    "name": "AlDAani",
+    "url": "https://github.com/AlDAani"
+  },
+  "types": "./types/index.d.ts",
+  "userConfig": {
+    "language": {
+      "type": "string",
+      "title": "Panel language",
+      "description": "auto follows Claude Code's language setting, then the system locale",
+      "default": "auto",
+      "options": [
+        "auto",
+        "en",
+        "ru"
+      ]
+    }
+  },
+  "homepage": "https://github.com/AlDAani/claude-good-look/tree/main/plugins/good-look-progress",
+  "repository": "https://github.com/AlDAani/claude-good-look",
+  "license": "MIT"
+}
