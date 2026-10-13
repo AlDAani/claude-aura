@@ -1,6 +1,6 @@
 {
   "name": "aura-flow",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Orchestrated delivery flow: the session model plans, owns design and reviews; five tiered worker subagents implement. Pairs with the aura-hud mod for a live progress bar and agents panel.",
   "author": {
     "name": "AlDAani",
