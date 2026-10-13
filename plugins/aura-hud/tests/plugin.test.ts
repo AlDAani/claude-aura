@@ -146,3 +146,24 @@ test('a finished worker stops counting as running', async ($, on) => {
   })
   expect(await report()).toContain('Tasks 0 running')
 })
+
+test('the panel shows the whole session total and follows it', async ($, on) => {
+  mock.clock(on, { now: 1_000 })
+  mock.store(on)
+  on('ui.open', () => PLACED)
+  on('session.start', (_engine, e) => ({ cwd: e.cwd }))
+  on('session.measure', (_engine, e) => ({ changed: e.changed }))
+  on('tool.register', (_engine, e) => ({ value: { tool: e.name } }))
+  on('command.register', (_engine, e) => ({ value: { command: e.name } }))
+  on('session.usage', () => ({ value: { startedAt: 0, context: { window: 1_000_000 }, rateLimits: [], cost: { usd: 250.4712 } } }))
+  await $.session.start({ cwd: '/work', surface: 'desktop', isInteractive: true })
+  const drawn = async (surface: (typeof SURFACES)[number]) => {
+    const ui = await $.ui.mount({ plugin: PLUGIN, surface, component: 'Pane', requestId: PANE, props: PANE_PROPS })
+    const tree = JSON.stringify(await ui.drawn())
+    await ui.unmount()
+    return tree
+  }
+  for (const surface of SURFACES) expect(await drawn(surface)).toContain('$250.47')
+  await $.session.measure({ context: { window: 1_000_000 }, rateLimits: [], cost: { usd: 251.1 }, changed: ['cost'] })
+  for (const surface of SURFACES) expect(await drawn(surface)).toContain('$251.10')
+})

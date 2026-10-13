@@ -3,6 +3,8 @@ export const S = {
   cost: 'Cost',
   tokens: 'Tokens',
   time: 'Time',
+  session: 'Session',
+  sessionWord: 'session',
   collapse: 'Collapse',
   expand: 'Expand',
   running: 'Running',

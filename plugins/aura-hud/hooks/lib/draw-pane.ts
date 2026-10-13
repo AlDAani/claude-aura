@@ -1,7 +1,7 @@
 import type { AgentRun, AgentStatus, Look, Tier } from '../../types'
 
 import { crab, crabCss } from './crab'
-import { fitText, fmtCost, fmtTime, fmtTokens, textWidth, xml } from './format'
+import { fitText, fmtCost, fmtTime, fmtTokens, fmtUsd, textWidth, xml } from './format'
 import { modelName } from './model'
 import { paletteCss, paletteOf, tierClass } from './palette'
 import type { InkClass } from './palette'
@@ -16,6 +16,10 @@ export const PLANNED_H = 46
 export const COMPACT_H = 32
 
 const CRAB_SCALE = 1.1
+const VALUE_SIZE = 15
+const TILE_H = 40
+const TILE_GAP = 6
+const TWO_ROWS_BELOW = 360
 const LIVE = '.live{animation:p 1.6s ease-in-out infinite}@keyframes p{50%{opacity:.3}}@media (prefers-reduced-motion: reduce){.live{animation:none}}'
 const SEP = '\u0001'
 const CACHE_LIMIT = 400
@@ -56,29 +60,47 @@ const statusMark = (x: number, y: number, status: AgentStatus | 'planned', tier:
   )
 }
 
-export const headerHeight = (title: string): number => (title ? 72 : 44)
+const tilesOf = (t: Totals, total: number | null): (readonly [string, string])[] => {
+  const tiles: (readonly [string, string])[] = [
+    [S.cost, '≈' + fmtCost(t.cost)],
+    [S.tokens, fmtTokens(t.tokens)],
+    [S.time, fmtTime(t.time)],
+  ]
+  if (total !== null) tiles.push([S.session, fmtUsd(total)])
+  return tiles
+}
 
-export const headerSvg = (W: number, title: string, t: Totals, lookId: Look): string => {
-  const gap = 6
-  const tw = (W - gap * 2) / 3
+const columnsOf = (W: number, count: number): number => (count > 3 && W < TWO_ROWS_BELOW ? 2 : count)
+
+export const headerHeight = (W: number, title: string, total: number | null): number => {
+  const count = total === null ? 3 : 4
+  return (title ? 28 : 0) + Math.ceil(count / columnsOf(W, count)) * (TILE_H + TILE_GAP) - 2
+}
+
+const valueSize = (value: string, maxW: number): number =>
+  Math.floor(Math.max(10, Math.min(VALUE_SIZE, (VALUE_SIZE * maxW) / Math.max(1, textWidth(value, VALUE_SIZE)))) * 2) / 2
+
+export const totalsText = (t: Totals, total: number | null): string =>
+  `≈${fmtCost(t.cost)} · ${fmtTokens(t.tokens)} · ${fmtTime(t.time)}` + (total === null ? '' : ` · ${S.sessionWord} ${fmtUsd(total)}`)
+
+export const headerSvg = (W: number, title: string, t: Totals, total: number | null, lookId: Look): string => {
+  const tiles = tilesOf(t, total)
+  const cols = columnsOf(W, tiles.length)
+  const tw = (W - TILE_GAP * (cols - 1)) / cols
   const top = title ? 28 : 0
-  const tile = (i: number, name: string, value: string): string => {
-    const x = i * (tw + gap)
+  const tile = ([name, value]: readonly [string, string], i: number): string => {
+    const x = (i % cols) * (tw + TILE_GAP)
+    const y = top + Math.floor(i / cols) * (TILE_H + TILE_GAP)
     return (
-      `<rect class="tile" x="${x}" y="${top}" width="${tw}" height="40" rx="8"/>` +
-      `<text class="s" x="${x + 9}" y="${top + 16}" font-size="11">${name}</text>` +
-      `<text class="t" x="${x + 9}" y="${top + 33}" font-size="15" font-weight="600">${value}</text>`
+      `<rect class="tile" x="${x}" y="${y}" width="${tw}" height="${TILE_H}" rx="8"/>` +
+      `<text class="s" x="${x + 9}" y="${y + 16}" font-size="11">${xml(fitText(name, 11, tw - 18))}</text>` +
+      `<text class="t" x="${x + 9}" y="${y + 33}" font-size="${valueSize(value, tw - 18)}" font-weight="600">${xml(value)}</text>`
     )
   }
   const head = title
     ? `<text class="t" x="0" y="15" font-size="14" font-weight="600">${xml(fitText(title, 14, W))}</text>`
     : ''
-  return svg(
-    W,
-    headerHeight(title),
-    paletteCss(paletteOf(lookId), HEADER_INK),
-    head + tile(0, S.cost, '≈' + fmtCost(t.cost)) + tile(1, S.tokens, fmtTokens(t.tokens)) + tile(2, S.time, fmtTime(t.time)),
-  )
+  return svg(W, headerHeight(W, title, total), paletteCss(paletteOf(lookId), HEADER_INK), head + tiles.map(tile).join(''))
 }
 
 export const agentSvg = (W: number, a: AgentRun, at: number, lookId: Look): string => {
@@ -137,7 +159,15 @@ export const plannedSvg = (W: number, pl: Planned, lookId: Look): string => {
 
 type Icon = { costume: Costume; tier: Tier; isRunning: boolean; isDim: boolean }
 
-export const compactSvg = (W: number, list: readonly AgentRun[], planned: readonly Planned[], t: Totals, lookId: Look): string => {
+export const compactSvg = (
+  W: number,
+  list: readonly AgentRun[],
+  planned: readonly Planned[],
+  t: Totals,
+  total: number | null,
+  lookId: Look,
+): string => {
+  const summary = totalsText(t, total)
   const runIcon = (a: AgentRun): Icon => ({
     costume: costumeOf(a.type),
     tier: tierOf(a.type),
@@ -149,7 +179,7 @@ export const compactSvg = (W: number, list: readonly AgentRun[], planned: readon
     ...list.filter(a => a.status !== 'running').map(runIcon),
     ...planned.map(pl => ({ costume: pl.tier, tier: pl.tier, isRunning: false, isDim: true })),
   ]
-  const fit = Math.max(1, Math.floor((W - 150) / 36))
+  const fit = Math.max(1, Math.floor((W - textWidth(summary, 12) - 24) / 36))
   const shown = icons.slice(0, fit)
   const more = icons.length - shown.length
   const walking = shown.filter(ic => ic.isRunning)
@@ -173,6 +203,6 @@ export const compactSvg = (W: number, list: readonly AgentRun[], planned: readon
     css,
     body +
       (more ? `<text class="s" x="${x}" y="21" font-size="12">+${more}</text>` : '') +
-      `<text class="s" x="${W}" y="21" text-anchor="end" font-size="12">≈${fmtCost(t.cost)} · ${fmtTokens(t.tokens)} · ${fmtTime(t.time)}</text>`,
+      `<text class="s" x="${W}" y="21" text-anchor="end" font-size="12">${xml(summary)}</text>`,
   )
 }

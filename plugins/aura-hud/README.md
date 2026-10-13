@@ -6,7 +6,7 @@ A Claude Code mod: a live panel of subagents. Made for the [aura-flow](../aura-f
 /plugin install aura-hud --marketplace AlDAani/claude-aura
 ```
 
-- **Agents panel**: opens by itself when subagents start working, and once per batch: closed, it stays closed until the next batch. It shows the flow's title and plan, and lists running, finished and planned subagents with model, effort, task progress, context, estimated cost and time. Working crabs walk, and each tier animates its prop: the astronaut floats, the detective sweeps the magnifier, the engineer turns the wrench, the chef tosses the omelette, the racer runs with a fluttering flag. `prefers-reduced-motion` stops them. The panel lists the 40 newest finished runs.
+- **Agents panel**: opens by itself when subagents start working, and once per batch: closed, it stays closed until the next batch. It shows the flow's title and plan, the cost, tokens and time of the agents it lists, and the cost of the whole session (the main thread and every subagent, the figure `/cost` shows). It lists running, finished and planned subagents with model, effort, task progress, context, estimated cost and time. Working crabs walk, and each tier animates its prop: the astronaut floats, the detective sweeps the magnifier, the engineer turns the wrench, the chef tosses the omelette, the racer runs with a fluttering flag. `prefers-reduced-motion` stops them. The panel lists the 40 newest finished runs.
 
 ## Palettes
 
@@ -26,7 +26,7 @@ Each palette has a light and a dark variant that follow the system appearance. S
 - `mcp__aura-hud__progress`: the orchestrator reports the plan, phase and accepted tasks.
 - `mcp__aura-hud__step`: a worker reports its own steps (`done`, `total`, `note`). A worker that does not report shows its context fill in grey instead.
 
-Cost is an estimate from token counts and a built-in table of Anthropic prices (`hooks/lib/model.ts`), not a bill.
+The agents' cost is an estimate from token counts and a built-in table of Anthropic prices (`hooks/lib/model.ts`), not a bill. The session tile is Claude Code's own running total, the same figure `/cost` shows.
 
 ## What it reads and keeps
 

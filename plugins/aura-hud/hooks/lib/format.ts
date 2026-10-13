@@ -7,6 +7,8 @@ export const fmtTokens = (n: number): string =>
 
 export const fmtCost = (usd: number): string => `$${usd < 10 ? usd.toFixed(2) : usd.toFixed(1)}`
 
+export const fmtUsd = (usd: number): string => `$${usd.toFixed(2)}`
+
 export const fmtTime = (ms: number): string => {
   const s = Math.max(0, Math.round(ms / 1000))
   const h = Math.floor(s / 3600)

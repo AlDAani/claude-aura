@@ -2,7 +2,7 @@ import { describe, expect, test } from 'claude-code/testing'
 
 import type { AgentRun } from '../types'
 
-import { agentSvg } from '../hooks/lib/draw-pane'
+import { agentSvg, compactSvg, headerHeight, headerSvg } from '../hooks/lib/draw-pane'
 import { blank, label, merge, readProgress, readStep } from '../hooks/lib/flow'
 import { fitText, textWidth } from '../hooks/lib/format'
 import { ratesOf, windowOf } from '../hooks/lib/model'
@@ -137,6 +137,42 @@ describe('drawing', () => {
   test('a still crab carries no animation css', () => {
     expect(agentSvg(600, run({ status: 'done', endedAt: 5_000 }), 9_000, 'claude')).not.toContain('@keyframes st')
     expect(agentSvg(600, run({}), 9_000, 'claude')).toContain('@keyframes st')
+  })
+
+  test('the header adds a session tile once the session total is known', () => {
+    const totals = { cost: 5.16, tokens: 14_500_000, time: 2_503_000 }
+    const withTotal = headerSvg(600, 'Aura flow', totals, 250.47, 'claude')
+    expect(withTotal).toContain('>Session<')
+    expect(withTotal).toContain('>$250.47<')
+    expect(withTotal).toContain('≈$5.16')
+    expect(headerSvg(600, 'Aura flow', totals, null, 'claude')).not.toContain('Session')
+  })
+
+  test('a narrow header wraps its tiles instead of squeezing the numbers', () => {
+    const totals = { cost: 5.16, tokens: 14_500_000, time: 2_503_000 }
+    for (const W of [240, 359, 360, 600]) {
+      const svg = headerSvg(W, 'Aura flow', totals, 12_345.67, 'claude')
+      const widths = [...svg.matchAll(/class="tile" x="[\d.]+" y="[\d.]+" width="([\d.]+)"/g)].map(m => Number(m[1]))
+      const values = [...svg.matchAll(/font-size="([\d.]+)" font-weight="600">([^<]+)</g)].slice(1)
+      expect(widths.length).toBe(4)
+      expect(values.length).toBe(4)
+      values.forEach(([, size, value], i) => {
+        expect(Number(size)).toBeGreaterThanOrEqual(12)
+        expect(textWidth(value ?? '', Number(size))).toBeLessThanOrEqual((widths[i] ?? 0) - 18 + 0.01)
+      })
+      expect(svg).toContain(`height="${headerHeight(W, 'Aura flow', 12_345.67)}"`)
+    }
+    expect(headerHeight(240, 'Aura flow', 1)).toBeGreaterThan(headerHeight(600, 'Aura flow', 1))
+    expect(headerHeight(600, 'Aura flow', null)).toBe(72)
+  })
+
+  test('the compact strip carries the session total and leaves room for it', () => {
+    const totals = { cost: 1, tokens: 1_000, time: 60_000 }
+    const runs = Array.from({ length: 30 }, (_, i) => run({ id: `r${i}`, status: 'done', endedAt: 5_000 }))
+    const strip = compactSvg(600, runs, [], totals, 250.47, 'claude')
+    expect(strip).toContain('session $250.47')
+    const crabs = (svg: string): number => (svg.match(/transform="translate\(/g) ?? []).length
+    expect(crabs(strip)).toBeLessThan(crabs(compactSvg(600, runs, [], totals, null, 'claude')))
   })
 
   test('fitText cuts to the width with an ellipsis', () => {

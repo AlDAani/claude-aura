@@ -4,7 +4,7 @@ import type { AgentRun, AgentStatus, Flow, Look, Panel } from '../../types'
 
 import { MAX_FINISHED_ROWS } from '../lib/consts'
 import { agentSvg, compactSvg, COMPACT_H, headerHeight, headerSvg, PLANNED_H, plannedSvg, ROW_H, TIER_MODEL } from '../lib/draw-pane'
-import { fmtCost, fmtTime, fmtTokens, textBar } from '../lib/format'
+import { fmtCost, fmtTime, fmtTokens, fmtUsd, textBar } from '../lib/format'
 import { modelName } from '../lib/model'
 import { paletteOf, tierHex } from '../lib/palette'
 import { ctxOf, elapsedOf, plannedOf, progressOf, showsSteps, tierOf, totalsOf } from '../lib/runs'
@@ -31,6 +31,7 @@ export type PaneView = {
   flow: Flow | null
   panel: Panel
   look: Look
+  total: number | null
   at: number
   bodyColumns: number
 }
@@ -51,7 +52,10 @@ export const paneTree = (ui: Elements[RenderSurface], v: PaneView, act: PaneActi
   const t = totalsOf(list, at)
   const title = f && !f.isFinished ? f.title : ''
   const isEmpty = list.length === 0 && planned.length === 0
-  const summary = `≈${fmtCost(t.cost)}, ${fmtTokens(t.tokens)} ${plural(t.tokens, 'token', 'tokens')}, ${fmtTime(t.time)}`
+  const sessionText = v.total === null ? '' : `${S.sessionWord} ${fmtUsd(v.total)}`
+  const summary = [`≈${fmtCost(t.cost)}`, `${fmtTokens(t.tokens)} ${plural(t.tokens, 'token', 'tokens')}`, fmtTime(t.time), sessionText]
+    .filter(Boolean)
+    .join(', ')
 
   const toggleCompact = (
     <Button
@@ -88,7 +92,7 @@ export const paneTree = (ui: Elements[RenderSurface], v: PaneView, act: PaneActi
       return (
         <Box flexDirection="column" gap={1}>
           <Svg
-            source={compactSvg(W, list, planned, t, lookId)}
+            source={compactSvg(W, list, planned, t, v.total, lookId)}
             alt={`${list.length} ${plural(list.length, 'agent', 'agents')}, ${summary}`}
             width={W}
             height={COMPACT_H}
@@ -100,10 +104,10 @@ export const paneTree = (ui: Elements[RenderSurface], v: PaneView, act: PaneActi
     return (
       <Box flexDirection="column">
         <Svg
-          source={headerSvg(W, title, t, lookId)}
+          source={headerSvg(W, title, t, v.total, lookId)}
           alt={title ? `${title}: ${summary}` : summary}
           width={W}
-          height={headerHeight(title)}
+          height={headerHeight(W, title, v.total)}
         />
         {toggleCompact}
         {isEmpty && <Text dimColor>{S.empty}</Text>}
@@ -177,6 +181,7 @@ export const paneTree = (ui: Elements[RenderSurface], v: PaneView, act: PaneActi
       </Box>
       <Text dimColor>
         ≈{fmtCost(t.cost)} · {fmtTokens(t.tokens)} {plural(t.tokens, 'token', 'tokens')} · {fmtTime(t.time)}
+        {sessionText && ` · ${sessionText}`}
       </Text>
       {p.isCompact ? (
         <Text wrap="truncate-end">

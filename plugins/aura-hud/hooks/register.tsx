@@ -20,6 +20,7 @@ const panel = atom({ plugin: 'aura-hud', key: 'panel' } as const, {
 })
 const now = atom({ plugin: 'aura-hud', key: 'now' } as const, 0)
 const look = atom({ plugin: 'aura-hud', key: 'look' } as const, 'claude')
+const total = atom({ plugin: 'aura-hud', key: 'total' } as const, null)
 
 const TOOL = 'mcp__aura-hud__progress'
 const STEP_TOOL = 'mcp__aura-hud__step'
@@ -45,6 +46,16 @@ async function autoOpen($: EngineInterface, key: string): Promise<void> {
   if ((await read($, panel)).autoOpenedFor === key) return
   await update($, panel, prev => ({ ...prev, autoOpenedFor: key }))
   void $.ui.open({ id: PANE, title: S.pane }).catch(() => undefined)
+}
+
+async function setTotal($: EngineInterface, usd: number | undefined): Promise<void> {
+  if (typeof usd !== 'number' || !Number.isFinite(usd)) return
+  const next = Math.round(usd * 100) / 100
+  await update($, total, prev => (prev === next ? prev : next))
+}
+
+async function syncTotal($: EngineInterface): Promise<void> {
+  await setTotal($, (await $.session.usage()).cost?.usd)
 }
 
 async function tick($: EngineInterface): Promise<void> {
@@ -175,8 +186,15 @@ export const register: Register = on => {
       argumentHint: '[auto|claude|chatgpt|webstorm]',
     })
     await quietly(() => refreshLook($))
+    await quietly(() => syncTotal($))
     $.clock.every(1000, () => void quietly(() => tick($)))
     return started
+  })
+
+  on('session.measure', async ($, e, next) => {
+    const measured = await next(e)
+    await quietly(() => setTotal($, e.cost?.usd))
+    return measured
   })
 
   on('command.run', { command: 'look' }, async ($, e) => ({ text: await setLook($, e.args) }))
@@ -225,6 +243,7 @@ export const register: Register = on => {
     const result = yield* next(e)
     const agentId = e.agentId
     const usage = result.usage
+    if (usage) await quietly(() => syncTotal($))
     if (!agentId || !usage) return result
     const model = usage.model || e.model || ''
     const effort = typeof e.effort === 'string' ? e.effort : undefined
@@ -265,6 +284,7 @@ export const register: Register = on => {
         flow: await read($, flow),
         panel: await read($, panel),
         look: await read($, look),
+        total: await read($, total),
         at,
         bodyColumns: e.props.bodyColumns,
       },

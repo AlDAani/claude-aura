@@ -64,6 +64,7 @@ declare module 'claude-code' {
       panel: Panel
       now: number
       look: Look
+      total: number | null
     }
   }
 }
