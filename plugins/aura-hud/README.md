@@ -20,7 +20,7 @@ A Claude Code mod: a progress bar above the prompt and a live panel of subagents
 | `chatgpt` | ChatGPT Dark: neutral greys and a white accent. |
 | `webstorm` | WebStorm Islands Dark: a blue accent and WebStorm's syntax colors for the tiers. |
 
-Each palette has a light and a dark variant that follow the system appearance. Setting a palette opens the agents panel so you can see it. `/look chatgpt` and `/look webstorm` also switch the Claude Code theme where the session lists the [aura-themes](../aura-themes) themes in its theme setting, and `/look claude` then brings back the theme you had before; elsewhere `/look` says to pick the theme in `/theme` in a terminal. The Claude desktop app keeps its own colors either way.
+Each palette has a light and a dark variant that follow the system appearance. Setting a palette opens the agents panel so you can see it. `/look` recolors only the bar and the panel: Claude Code's own colors come from its theme, picked in `/theme` in a terminal (the [aura-themes](../aura-themes) themes match these palettes), and the Claude desktop app keeps its own colors. Should Claude Code ever offer plugin themes in its theme setting, `/look chatgpt` and `/look webstorm` switch to the matching theme and `/look claude` brings back the one you had.
 
 ## Tools it adds
 
@@ -31,7 +31,7 @@ Cost is an estimate from token counts and a built-in table of Anthropic prices (
 
 ## What it reads and keeps
 
-It reads what Claude Code hands every mod: subagent launches and their token usage, and the `theme` setting for `/look auto`. It keeps the panel's data in the session's state and the `/look` choice in its own plugin store. It sends nothing anywhere and runs no commands.
+It reads what Claude Code hands every mod: subagent launches and their token usage, and the `theme` setting for `/look auto`. It changes the `theme` setting only from `/look`, as described above. It keeps the panel's data in the session's state, and the `/look` choice and the theme to restore in its own plugin store. It sends nothing anywhere and runs no commands.
 
 ## Development
 

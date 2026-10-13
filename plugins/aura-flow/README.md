@@ -2,6 +2,10 @@
 
 An orchestrated delivery flow for Claude Code. Run `/flow <task>` (its full name is `/aura-flow:flow`, for when another command already uses `/flow`): the session model plans, owns design, delegates implementation to tiered worker subagents and adversarially reviews what they return.
 
+```
+/plugin install aura-flow --marketplace AlDAani/claude-aura
+```
+
 ## What ships
 
 - **Skill** `flow`: the orchestrator's playbook.

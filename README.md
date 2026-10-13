@@ -15,7 +15,7 @@ aura-flow and aura-hud work on their own and light up together: with both instal
 | Command | What it does |
 | --- | --- |
 | `/flow <task>` | Plans the task, hands it to tiered worker agents and reviews what they return. The full name is `/aura-flow:flow`, for when another command already uses `/flow`. |
-| `/look [auto\|claude\|chatgpt\|webstorm]` | Picks the colors of the progress bar and the agents panel and opens the panel to show them. Where the session lists the aura-themes themes in its theme setting, it switches the Claude Code theme too; otherwise pick that theme in `/theme` in a terminal. Without an argument it shows the current choice. |
+| `/look [auto\|claude\|chatgpt\|webstorm]` | Picks the colors of the progress bar and the agents panel and opens the panel to show them. Without an argument it shows the current choice. It does not recolor Claude Code itself: for that, pick an aura-themes theme in `/theme` in a terminal. |
 
 The agents panel needs no command: it opens by itself when subagents start working, and the crew button on the progress bar shows or hides it.
 
@@ -35,7 +35,10 @@ In Claude Code:
 In the Claude desktop app `/plugin` opens the plugin browser instead; install from a terminal there:
 
 ```bash
-claude plugin install aura-hud --marketplace AlDAani/claude-aura
+claude plugin marketplace add AlDAani/claude-aura
+claude plugin install aura-flow@claude-aura
+claude plugin install aura-hud@claude-aura
+claude plugin install aura-themes@claude-aura
 ```
 
 Restart the session afterwards.
@@ -54,6 +57,12 @@ cp -R ~/claude-aura/plugins/aura-flow/skills/flow ~/.claude/skills/
 
 ```bash
 cp ~/claude-aura/plugins/aura-flow/agents/*.md ~/.claude/agents/
+```
+
+**A theme pack**: copy its themes into your Claude Code config; they show in `/theme` as your own custom themes.
+
+```bash
+mkdir -p ~/.claude/themes && cp ~/claude-aura/plugins/aura-themes/themes/*.json ~/.claude/themes/
 ```
 
 **A mod**: load the folder for one session,
