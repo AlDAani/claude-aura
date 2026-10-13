@@ -1,17 +1,16 @@
 # aura-hud
 
-A Claude Code mod: a progress bar above the prompt and a live panel of subagents. Made for the [aura-flow](../aura-flow) skill, and useful with any subagents.
+A Claude Code mod: a live panel of subagents. Made for the [aura-flow](../aura-flow) skill, and useful with any subagents.
 
 ```
 /plugin install aura-hud --marketplace AlDAani/claude-aura
 ```
 
-- **Progress bar**: the flow's title, phase, accepted tasks out of planned, and a button with the crew size that opens the panel. It appears once something reports progress (aura-flow does) or an `aura-*` worker starts. Workers in flight show as a faint layer ahead of the accepted part.
-- **Agents panel**: opens by itself when subagents start working, and the crew button on the bar shows or hides it. It lists running, finished and planned subagents with model, effort, task progress, context, estimated cost and time. Working crabs walk, and each tier animates its prop: the astronaut floats, the detective sweeps the magnifier, the engineer turns the wrench, the chef tosses the omelette, the racer runs with a fluttering flag. `prefers-reduced-motion` stops them. The panel lists the 40 newest finished runs.
+- **Agents panel**: opens by itself when subagents start working, and once per batch: closed, it stays closed until the next batch. It shows the flow's title and plan, and lists running, finished and planned subagents with model, effort, task progress, context, estimated cost and time. Working crabs walk, and each tier animates its prop: the astronaut floats, the detective sweeps the magnifier, the engineer turns the wrench, the chef tosses the omelette, the racer runs with a fluttering flag. `prefers-reduced-motion` stops them. The panel lists the 40 newest finished runs.
 
 ## Palettes
 
-`/look` picks the palette the bar and the panel draw with:
+`/look` picks the palette the panel draws with:
 
 | `/look` | Palette |
 | --- | --- |
@@ -20,7 +19,7 @@ A Claude Code mod: a progress bar above the prompt and a live panel of subagents
 | `chatgpt` | ChatGPT Dark: neutral greys and a white accent. |
 | `webstorm` | WebStorm Islands Dark: a blue accent and WebStorm's syntax colors for the tiers. |
 
-Each palette has a light and a dark variant that follow the system appearance. Setting a palette opens the agents panel so you can see it. `/look` recolors only the bar and the panel: Claude Code's own colors come from its theme, picked in `/theme` in a terminal (the [aura-themes](../aura-themes) themes match these palettes), and the Claude desktop app keeps its own colors. Should Claude Code ever offer plugin themes in its theme setting, `/look chatgpt` and `/look webstorm` switch to the matching theme and `/look claude` brings back the one you had.
+Each palette has a light and a dark variant that follow the system appearance. Setting a palette opens the agents panel so you can see it. `/look` recolors only the panel: Claude Code's own colors come from its theme, picked in `/theme` in a terminal (the [aura-themes](../aura-themes) themes match these palettes), and the Claude desktop app keeps its own colors. Should Claude Code ever offer plugin themes in its theme setting, `/look chatgpt` and `/look webstorm` switch to the matching theme and `/look claude` brings back the one you had.
 
 ## Tools it adds
 

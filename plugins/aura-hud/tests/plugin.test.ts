@@ -10,21 +10,23 @@ const PROVIDER = { plugin: 'test', tier: 'user' } as const
 const SPAWN = { prompt: 'x', provider: PROVIDER, parentModel: 'claude-opus-5-5', background: true, fork: false } as const
 const COMMAND = { origin: { kind: 'composer' }, presentation: { isFullscreen: false, columns: 120 } } as const
 const SCROLL = { offset: 0, bodyRows: 40 }
-const BAND_PROPS = { hasSurvey: false, isWorking: false, maxRows: 4, bodyColumns: 120, scroll: SCROLL, view: {} }
 const PANE_PROPS = { title: 'Agents', isFocused: false, bodyColumns: 80, placement: 'dock', scroll: SCROLL, view: {} } as const
 const TURN = { answer: 'done', durationMs: 1200, isAborted: false, turnId: 'turn-1' }
 const PLACED = { value: { isPlaced: true } } as const
 
-test('a worker launch brings up the band with the crew count', async ($, on) => {
+test('a worker launch opens the agents panel and lists the run', async ($, on) => {
+  const opened: string[] = []
   mock.clock(on, { now: 1_000 })
   on('agent.spawn', () => ({ agentId: 'a1', model: 'claude-opus-5-5' }))
-  on('ui.open', () => PLACED)
+  on('ui.open', (_engine, e) => {
+    opened.push(e.id)
+    return PLACED
+  })
   await $.agent.spawn({ ...SPAWN, description: 'Fix it', subagentType: 'aura-flow:aura-careful', tool_use_id: 't1' })
+  expect(opened).toEqual([PANE])
   for (const surface of SURFACES) {
-    const ui = await $.ui.mount({ plugin: PLUGIN, surface, component: 'AbovePrompt', props: BAND_PROPS })
-    expect(await ui.find({ key: 'aura-dismiss' })).toBeDefined()
-    expect((await ui.find({ key: 'aura-agents' }))?.text).toContain('×1')
-    expect(JSON.stringify(await ui.drawn())).toContain(surface === 'desktop' ? '"type":"Svg"' : 'Tasks 1 running')
+    const ui = await $.ui.mount({ plugin: PLUGIN, surface, component: 'Pane', requestId: PANE, props: PANE_PROPS })
+    expect(JSON.stringify(await ui.drawn())).toContain('Fix it')
     await ui.unmount()
   }
 })
@@ -34,9 +36,6 @@ test('the progress tool clamps a runaway total and answers the model', async ($,
   on('ui.open', () => PLACED)
   const answer = await $.tool.call({ tool: TOOL, tool_use_id: 'p1', title: 'Big', total: 1e9, done: 3, phase: 'delegate' })
   expect(JSON.stringify(answer)).toContain('Tasks 3/50')
-  const ui = await $.ui.mount({ plugin: PLUGIN, surface: 'desktop', component: 'AbovePrompt', props: BAND_PROPS })
-  expect(JSON.stringify(await ui.drawn()).length).toBeLessThan(131072)
-  await ui.unmount()
 })
 
 test('the panel opens by itself when agents start working, once per batch', async ($, on) => {
@@ -136,17 +135,14 @@ test('a finished worker stops counting as running', async ($, on) => {
   on('agent.spawn', () => ({ agentId: 'a1', model: 'claude-haiku-5-5' }))
   on('ui.open', () => PLACED)
   on('turn.complete', () => ({ text: 'done' }))
+  const report = async () => JSON.stringify(await $.tool.call({ tool: TOOL, tool_use_id: 'p', phase: 'delegate' }))
   await $.agent.spawn({ ...SPAWN, description: 'Run tests', subagentType: 'aura-light', tool_use_id: 't1' })
-  const before = await $.ui.mount({ plugin: PLUGIN, surface: 'terminal', component: 'AbovePrompt', props: BAND_PROPS })
-  expect(JSON.stringify(await before.drawn())).toContain('1 running')
-  await before.unmount()
+  expect(await report()).toContain('Tasks 1 running')
   await $.turn.complete({
     ...TURN,
     agentId: 'a1',
     reason: 'answer',
     usage: { model: 'claude-haiku-5-5', input_tokens: 1000, output_tokens: 200, cache_read_input_tokens: 0, cache_creation_input_tokens: 0 },
   })
-  const after = await $.ui.mount({ plugin: PLUGIN, surface: 'terminal', component: 'AbovePrompt', props: BAND_PROPS })
-  expect(JSON.stringify(await after.drawn())).toContain('0 running')
-  await after.unmount()
+  expect(await report()).toContain('Tasks 0 running')
 })

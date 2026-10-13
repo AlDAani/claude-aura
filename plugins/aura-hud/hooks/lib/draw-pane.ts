@@ -1,7 +1,6 @@
 import type { AgentRun, AgentStatus, Look, Tier } from '../../types'
 
 import { crab, crabCss } from './crab'
-import { TEXT_CSS } from './draw-band'
 import { fitText, fmtCost, fmtTime, fmtTokens, textWidth, xml } from './format'
 import { modelName } from './model'
 import { paletteCss, paletteOf, tierClass } from './palette'
@@ -9,6 +8,8 @@ import type { InkClass } from './palette'
 import type { Costume, Planned, Totals } from './runs'
 import { costumeOf, ctxOf, elapsedOf, progressOf, showsSteps, tierOf } from './runs'
 import { S } from './strings'
+
+const TEXT_CSS = "text{font-family:-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',sans-serif;font-variant-numeric:tabular-nums}"
 
 export const ROW_H = 66
 export const PLANNED_H = 46

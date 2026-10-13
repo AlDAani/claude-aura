@@ -13,4 +13,3 @@ export const MAX_NOTE = 80
 export const MAX_STEPS = 50
 export const MAX_RUNS = 200
 export const MAX_FINISHED_ROWS = 40
-export const MIN_TICK_GAP = 4

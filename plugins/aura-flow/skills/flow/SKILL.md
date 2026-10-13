@@ -16,7 +16,7 @@ Task from the user: $ARGUMENTS
 - The flow is designed for a strong orchestrator model at high effort (Fable high is the reference setup). Do not try to detect or verify the session's model or effort — you cannot see the effort level. Whatever the session runs on is the user's deliberate choice; just orchestrate.
 - Worker agents must exist: `aura-fable`, `aura-heavy`, `aura-careful`, `aura-medium`, `aura-light` (in `~/.claude/agents/`, or shipped with the aura-flow plugin, in which case the Agent tool lists them as `aura-flow:aura-careful` and so on). If the Agent tool does not list them, stop and tell the user.
 
-## Progress bar
+## Agents panel
 
 If `mcp__aura-hud__progress` appears among your tools, including as a deferred tool, keep it current: a deferred tool only needs loading first with ToolSearch (`select:mcp__aura-hud__progress`). Skip silently only if the tool is absent or ToolSearch does not find it. Call it:
 - after presenting the plan: `title` (a few words), `total` (number of worker tasks), `tasks` (`[{ title, tier, after }]` in plan order; `tier` without the `aura-` prefix, `after` the numbers of the tasks it waits for), `phase: "delegate"` (or `"design"` while in section 2);

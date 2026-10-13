@@ -45,7 +45,6 @@ export type AgentRun = {
 }
 
 export type Crew = {
-  size: number
   running: number
   workers: number
 }

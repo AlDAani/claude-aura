@@ -93,7 +93,6 @@ export const workerFlow = (prev: Flow | null): Flow => {
   return base.phase === 'plan' ? { ...base, phase: 'delegate' } : base
 }
 
-export const ratio = (f: Flow): number => (f.isFinished ? 1 : f.total ? Math.min(1, f.done / f.total) : 0)
 
 export const label = (f: Flow, workers: number): string => {
   if (f.isFinished) return S.done

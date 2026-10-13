@@ -2,16 +2,13 @@ import { describe, expect, test } from 'claude-code/testing'
 
 import type { AgentRun } from '../types'
 
-import { bandSvg } from '../hooks/lib/draw-band'
 import { agentSvg } from '../hooks/lib/draw-pane'
 import { blank, label, merge, readProgress, readStep } from '../hooks/lib/flow'
 import { fitText, textWidth } from '../hooks/lib/format'
 import { ratesOf, windowOf } from '../hooks/lib/model'
-import { lookOfTheme, onColor, paletteCss, paletteOf } from '../hooks/lib/palette'
+import { lookOfTheme, paletteCss, paletteOf } from '../hooks/lib/palette'
 import { costumeOf, crewOf, tierOf } from '../hooks/lib/runs'
 import { plural } from '../hooks/lib/strings'
-
-const SVG_LIMIT = 131072
 
 const run = (over: Partial<AgentRun>): AgentRun => ({
   id: 'a1',
@@ -105,7 +102,7 @@ describe('labels and crew', () => {
 
   test('only aura workers count as workers', () => {
     const list = [run({}), run({ id: 'b', agentId: 'b', type: 'Explore' }), run({ id: 'c', agentId: 'c', status: 'done' })]
-    expect(crewOf(null, list)).toEqual({ size: 3, running: 2, workers: 1 })
+    expect(crewOf(list)).toEqual({ running: 2, workers: 1 })
   })
 
   test('tiers resolve without trusting prototype keys', () => {
@@ -123,18 +120,6 @@ describe('labels and crew', () => {
 })
 
 describe('drawing', () => {
-  test('the widest, fullest band stays far below the Svg limit', () => {
-    const f = { ...blank(), title: 'A fairly long flow title for the band', total: 50, done: 50, phase: 'review' as const }
-    const svg = bandSvg(f, 0, 1600, true, 'claude')
-    expect(svg.length).toBeLessThan(SVG_LIMIT / 2)
-    expect(svg).toContain('</svg>')
-  })
-
-  test('the band draws workers in flight as a faint layer', () => {
-    const f = { ...blank(), phase: 'delegate' as const, total: 4, done: 1 }
-    expect(bandSvg(f, 2, 900, false, 'webstorm')).toContain('opacity="0.45"><path')
-  })
-
   test('agent rows are small and cached', () => {
     const a = run({ status: 'done', endedAt: 5_000 })
     const first = agentSvg(600, a, 9_000, 'chatgpt')
@@ -163,13 +148,6 @@ describe('drawing', () => {
 })
 
 describe('palettes', () => {
-  test('text on a pill picks the readable ink', () => {
-    expect(onColor('#8f8cf4')).toBe('#141413')
-    expect(onColor('#ececec')).toBe('#141413')
-    expect(onColor('#3871e1')).toBe('#ffffff')
-    expect(onColor('#0d0d0d')).toBe('#ffffff')
-  })
-
   test('css holds both modes and only the tiers asked for', () => {
     const css = paletteCss(paletteOf('webstorm'), ['t'], ['medium'])
     expect(css).toContain('@media (prefers-color-scheme: dark)')

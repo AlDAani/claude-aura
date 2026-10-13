@@ -8,12 +8,11 @@ import { blank, isNewFlow, label, merge, readProgress, readStep, workerFlow } fr
 import { isLookSetting, lookOfTheme, paletteOf, THEME_OF, THEME_PREFIX } from './lib/palette'
 import { addRun, applyStep, applyStepReport, crewOf, finishRun, isWorkerType, patchRun, sameCrew } from './lib/runs'
 import { S } from './lib/strings'
-import { bandTree } from './views/band'
 import { paneTree } from './views/pane'
 
 const flow = atom({ plugin: 'aura-hud', key: 'flow' } as const, null)
 const agents = atom({ plugin: 'aura-hud', key: 'agents' } as const, [])
-const crew = atom({ plugin: 'aura-hud', key: 'crew' } as const, { size: 0, running: 0, workers: 0 })
+const crew = atom({ plugin: 'aura-hud', key: 'crew' } as const, { running: 0, workers: 0 })
 const panel = atom({ plugin: 'aura-hud', key: 'panel' } as const, {
   isCompact: false,
   isDoneCollapsed: false,
@@ -37,32 +36,15 @@ const quietly = async (work: () => Promise<unknown>): Promise<void> => {
 }
 
 async function syncCrew($: EngineInterface): Promise<Crew> {
-  const next = crewOf(await read($, flow), await read($, agents))
+  const next = crewOf(await read($, agents))
   await update($, crew, prev => (sameCrew(prev, next) ? prev : next))
   return next
-}
-
-async function togglePane($: EngineInterface): Promise<boolean> {
-  const pane = (await $.ui.panes()).find(p => p.id === PANE)
-  if (pane?.isPlaced && pane.isShown) {
-    await $.ui.close({ id: PANE })
-    return false
-  }
-  const at = await $.clock.now()
-  await update($, now, () => at)
-  await $.ui.open({ id: PANE, title: S.pane })
-  return true
 }
 
 async function autoOpen($: EngineInterface, key: string): Promise<void> {
   if ((await read($, panel)).autoOpenedFor === key) return
   await update($, panel, prev => ({ ...prev, autoOpenedFor: key }))
   void $.ui.open({ id: PANE, title: S.pane }).catch(() => undefined)
-}
-
-async function dismissFlow($: EngineInterface): Promise<void> {
-  await update($, flow, () => null)
-  await syncCrew($)
 }
 
 async function tick($: EngineInterface): Promise<void> {
@@ -138,7 +120,7 @@ export const register: Register = on => {
     await $.tool.register({
       name: 'progress',
       description:
-        'Report /flow progress to the progress bar above the prompt and the agents panel. ' +
+        'Report /flow progress to the agents panel: the plan, the phase and the tasks accepted so far. ' +
         'Call it after presenting the plan (title, total, tasks, phase "delegate"), each time a task is accepted (done), ' +
         'when switching phase or re-planning (tasks), and once at the end with finished: true. Fields left out keep their previous value.',
       inputSchema: {
@@ -189,7 +171,7 @@ export const register: Register = on => {
     })
     await $.command.register({
       name: 'look',
-      description: 'Pick the palette of the agents panel and band: auto, claude, chatgpt or webstorm',
+      description: 'Pick the palette of the agents panel: auto, claude, chatgpt or webstorm',
       argumentHint: '[auto|claude|chatgpt|webstorm]',
     })
     await quietly(() => refreshLook($))
@@ -214,7 +196,7 @@ export const register: Register = on => {
     const c = await syncCrew($)
     if (next && input.tasks?.length) await autoOpen($, next.title)
     return { result: `ok: ${label(next ?? blank(), c.workers)}` }
-  }).catch(() => ({ result: 'ignored: the progress bar could not record this' }))
+  }).catch(() => ({ result: 'ignored: the agents panel could not record this' }))
 
   on('tool.call', { tool: STEP_TOOL }, async ($, e) => {
     const agentId = e.agentId
@@ -290,16 +272,6 @@ export const register: Register = on => {
         toggleCompact: () => update($, panel, prev => ({ ...prev, isCompact: !prev.isCompact })),
         toggleDone: () => update($, panel, prev => ({ ...prev, isDoneCollapsed: !prev.isDoneCollapsed })),
       },
-    )
-  })
-
-  on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => {
-    const f = await read($, flow)
-    if (f === null || e.props.hasSurvey) return next(e)
-    return bandTree(
-      $.ui.resolve(e),
-      { surface: e.surface, flow: f, crew: await read($, crew), look: await read($, look), bodyColumns: e.props.bodyColumns },
-      { toggle: () => void togglePane($), dismiss: () => dismissFlow($) },
     )
   })
 }

@@ -123,7 +123,7 @@ export const applyStepReport = (a: AgentRun, input: StepInput): AgentRun => {
   return { ...a, stepTotal: total, stepDone: total ? Math.min(total, done) : done, stepNote: input.note || undefined }
 }
 
-export const crewOf = (f: Flow | null, list: readonly AgentRun[]): Crew => {
+export const crewOf = (list: readonly AgentRun[]): Crew => {
   let running = 0
   let workers = 0
   for (const a of list) {
@@ -131,8 +131,8 @@ export const crewOf = (f: Flow | null, list: readonly AgentRun[]): Crew => {
     running += 1
     if (isWorkerType(a.type)) workers += 1
   }
-  return { size: list.length + plannedOf(f, list).length, running, workers }
+  return { running, workers }
 }
 
 export const sameCrew = (a: Crew, b: Crew): boolean =>
-  a.size === b.size && a.running === b.running && a.workers === b.workers
+  a.running === b.running && a.workers === b.workers

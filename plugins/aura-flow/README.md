@@ -23,6 +23,6 @@ An orchestrated delivery flow for Claude Code. Run `/flow <task>` (its full name
 
 ## With aura-hud
 
-The skill and the agents run fine alone. With the [aura-hud](../aura-hud) mod installed, the orchestrator reports the plan and accepted tasks to a progress bar above the prompt, and each worker reports its own steps to the agents panel. Without the mod those calls are skipped.
+The skill and the agents run fine alone. With the [aura-hud](../aura-hud) mod installed, the orchestrator shows the plan and accepted tasks in the agents panel, and each worker reports its own steps there. Without the mod those calls are skipped.
 
 Install instructions are in the [repository README](../../README.md).
