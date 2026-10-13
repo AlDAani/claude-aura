@@ -7,7 +7,7 @@ import { agentSvg, compactSvg, COMPACT_H, headerHeight, headerSvg, PLANNED_H, pl
 import { fmtCost, fmtTime, fmtTokens, textBar } from '../lib/format'
 import { modelName } from '../lib/model'
 import { paletteOf, tierHex } from '../lib/palette'
-import { ctxOf, elapsedOf, plannedOf, progressOf, tierOf, totalsOf } from '../lib/runs'
+import { ctxOf, elapsedOf, plannedOf, progressOf, showsSteps, tierOf, totalsOf } from '../lib/runs'
 import { plural, S } from '../lib/strings'
 
 const STATUS_GLYPH: Readonly<Record<AgentStatus, string>> = { running: '●', done: '✓', failed: '✗' }
@@ -20,7 +20,7 @@ const modelLine = (a: AgentRun): string => (a.effort ? `${modelName(a.model)} ·
 const rowAlt = (a: AgentRun, at: number): string => {
   const tier = tierOf(a.type)
   const parts = [`${a.description || a.type}: ${tier === 'other' ? a.type : tier}`, modelLine(a), stateWord(a.status)]
-  if (a.stepTotal) parts.push(`step ${a.stepDone ?? 0} of ${a.stepTotal}${a.stepNote ? `, ${a.stepNote}` : ''}`)
+  if (showsSteps(a)) parts.push(`step ${a.stepDone ?? 0} of ${a.stepTotal}${a.stepNote ? `, ${a.stepNote}` : ''}`)
   parts.push(`${S.ctx} ${ctxOf(a)}%`, `≈${fmtCost(a.costUsd)}`, fmtTime(elapsedOf(a, at)))
   return parts.join(', ')
 }
@@ -139,7 +139,7 @@ export const paneTree = (ui: Elements[RenderSurface], v: PaneView, act: PaneActi
     const color = tierHex(palette, tier)
     const ctx = ctxOf(a)
     const progress = progressOf(a)
-    const steps = a.stepTotal ? `${a.stepDone ?? 0}/${a.stepTotal}${a.stepNote ? ' ' + a.stepNote : ''} · ` : ''
+    const steps = showsSteps(a) ? `${a.stepDone ?? 0}/${a.stepTotal}${a.stepNote ? ' ' + a.stepNote : ''} · ` : ''
     return (
       <Box key={a.id} flexDirection="column" marginBottom={1}>
         <Box flexDirection="row" gap={1}>

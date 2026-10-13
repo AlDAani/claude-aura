@@ -56,6 +56,8 @@ export const progressOf = (a: AgentRun): number | null => {
   return null
 }
 
+export const showsSteps = (a: AgentRun): boolean => Boolean(a.stepTotal) && a.status !== 'done'
+
 export const ctxOf = (a: AgentRun): number =>
   a.contextMax ? Math.min(100, Math.round((a.contextTokens / a.contextMax) * 100)) : 0
 

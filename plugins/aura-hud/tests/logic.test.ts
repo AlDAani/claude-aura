@@ -142,6 +142,13 @@ describe('drawing', () => {
     expect(agentSvg(600, a, 12_000, 'chatgpt')).toBe(first)
   })
 
+  test('a finished run drops its last step report, a failed one keeps it', () => {
+    const reported = { stepDone: 4, stepTotal: 6, stepNote: 'Run verify', endedAt: 5_000 }
+    expect(agentSvg(600, run({ ...reported, status: 'done' }), 9_000, 'claude')).not.toContain('4/6')
+    expect(agentSvg(600, run({ ...reported, status: 'failed' }), 9_000, 'claude')).toContain('4/6 · Run verify')
+    expect(agentSvg(600, run({ ...reported, status: 'running', endedAt: undefined }), 9_000, 'claude')).toContain('4/6 · Run verify')
+  })
+
   test('a still crab carries no animation css', () => {
     expect(agentSvg(600, run({ status: 'done', endedAt: 5_000 }), 9_000, 'claude')).not.toContain('@keyframes st')
     expect(agentSvg(600, run({}), 9_000, 'claude')).toContain('@keyframes st')

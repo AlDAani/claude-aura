@@ -7,7 +7,7 @@ import { modelName } from './model'
 import { paletteCss, paletteOf, tierClass } from './palette'
 import type { InkClass } from './palette'
 import type { Costume, Planned, Totals } from './runs'
-import { costumeOf, ctxOf, elapsedOf, progressOf, tierOf } from './runs'
+import { costumeOf, ctxOf, elapsedOf, progressOf, showsSteps, tierOf } from './runs'
 import { S } from './strings'
 
 export const ROW_H = 66
@@ -89,7 +89,7 @@ export const agentSvg = (W: number, a: AgentRun, at: number, lookId: Look): stri
   if (a.status === 'failed') meta.push(S.failed)
   const progress = progressOf(a)
   const stats = `${S.ctx} ${ctx}% · ${fmtTokens(a.contextTokens)}  ≈${fmtCost(a.costUsd)}  ${fmtTime(elapsedOf(a, at))}`
-  const steps = a.stepTotal ? `${a.stepDone ?? 0}/${a.stepTotal}${a.stepNote ? ' · ' + a.stepNote : ''}` : ''
+  const steps = showsSteps(a) ? `${a.stepDone ?? 0}/${a.stepTotal}${a.stepNote ? ' · ' + a.stepNote : ''}` : ''
   const fillW = Math.round(textW * (progress ?? ctx / 100))
   const key = ['row', lookId, W, a.id, a.status, a.type, a.description, meta.join(' '), stats, steps, fillW, progress === null].join(SEP)
   const hit = cache.get(key)
