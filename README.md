@@ -5,9 +5,10 @@ Skins for [Claude Code](https://claude.com/claude-code): mods that change how it
 | Plugin | Type | What it does |
 | --- | --- | --- |
 | [good-look-flow](plugins/good-look-flow) | skill + agents | `/good-look-flow <task>`: the session model plans, delegates to tiered worker subagents and reviews their work. |
-| [good-look-progress](plugins/good-look-progress) | mod | A progress bar above the prompt and a live agents panel. Made for good-look-flow, shows any subagents. |
+| [good-look-progress](plugins/good-look-progress) | mod | A progress bar above the prompt and a live agents panel, in Claude, ChatGPT Dark or WebStorm Islands Dark colors (`/look`). Made for good-look-flow, shows any subagents. |
+| [good-look-themes](plugins/good-look-themes) | themes | ChatGPT Dark and WebStorm Islands Dark color themes for Claude Code, picked in `/theme`. |
 
-good-look-flow and good-look-progress work on their own and light up together: with both installed, the flow drives the bar and workers report their progress to the panel.
+good-look-flow and good-look-progress work on their own and light up together: with both installed, the flow drives the bar and workers report their progress to the panel. good-look-themes recolors Claude Code itself, and `/look` in good-look-progress switches the theme and the panel together.
 
 ## Install
 
@@ -19,6 +20,13 @@ In Claude Code:
 /plugin marketplace add AlDAani/claude-good-look
 /plugin install good-look-flow@claude-good-look
 /plugin install good-look-progress@claude-good-look
+/plugin install good-look-themes@claude-good-look
+```
+
+In the Claude desktop app `/plugin` opens the plugin browser instead; install from a terminal there:
+
+```bash
+claude plugin install good-look-progress --marketplace AlDAani/claude-good-look
 ```
 
 Restart the session afterwards. Plugin skills and agents are namespaced: the skill is `/good-look-flow:good-look-flow`, the agents `good-look-flow:good-look-careful` and so on.
@@ -69,7 +77,10 @@ plugins/<name>/
   agents/*.md                     subagents it ships
   hooks/hooks.json                a mod: points at the hooks module
   hooks/register.tsx              a mod: the module itself
+  hooks/lib/, hooks/views/        a mod: what the module draws and computes
   types/index.d.ts                a mod: its $.state contract
+  tests/*.test.ts                 a mod: its tests, run by `claude plugin test`
+  themes/*.json                   a theme pack: Claude Code color themes
 ```
 
 Check a plugin before publishing: `claude plugin validate plugins/<name>`, and the catalog with `claude plugin validate .`.

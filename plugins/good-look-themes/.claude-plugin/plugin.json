@@ -1,0 +1,13 @@
+{
+  "name": "good-look-themes",
+  "version": "1.0.0",
+  "description": "Claude Code color themes: ChatGPT Dark and WebStorm Islands Dark, picked in /theme.",
+  "author": {
+    "name": "AlDAani",
+    "url": "https://github.com/AlDAani"
+  },
+  "homepage": "https://github.com/AlDAani/claude-good-look/tree/main/plugins/good-look-themes",
+  "repository": "https://github.com/AlDAani/claude-good-look",
+  "license": "MIT",
+  "keywords": ["theme", "colors", "chatgpt", "webstorm"]
+}

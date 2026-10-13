@@ -1,8 +1,14 @@
 export type Phase = 'plan' | 'design' | 'delegate' | 'review' | 'close'
 
+export type Tier = 'fable' | 'heavy' | 'careful' | 'medium' | 'light' | 'other'
+
+export type Look = 'claude' | 'chatgpt' | 'webstorm'
+
+export type LookSetting = 'auto' | Look
+
 export type PlannedTask = {
   title: string
-  tier: string
+  tier: Tier
   after: number[]
 }
 
@@ -10,7 +16,6 @@ export type Flow = {
   title: string
   total: number
   done: number
-  running: number
   phase: Phase
   isFinished: boolean
   tasks: PlannedTask[]
@@ -34,10 +39,15 @@ export type AgentRun = {
   costUsd: number
   steps: number
   round: number
-  /** Self-reported by the worker through the `step` tool. */
   stepDone?: number
   stepTotal?: number
   stepNote?: string
+}
+
+export type Crew = {
+  size: number
+  running: number
+  workers: number
 }
 
 export type Panel = {
@@ -51,8 +61,10 @@ declare module 'claude-code' {
     'good-look-progress': {
       flow: Flow | null
       agents: AgentRun[]
+      crew: Crew
       panel: Panel
       now: number
+      look: Look
     }
   }
 }

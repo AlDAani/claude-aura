@@ -1,20 +1,30 @@
 {
   "name": "claude-good-look",
-  "owner": { "name": "AlDAani", "url": "https://github.com/AlDAani" },
+  "owner": {
+    "name": "AlDAani",
+    "url": "https://github.com/AlDAani"
+  },
   "plugins": [
     {
       "name": "good-look-flow",
       "source": "./plugins/good-look-flow",
       "description": "Skill: plan, delegate to tiered worker subagents, review.",
-      "version": "1.0.0",
+      "version": "1.0.1",
       "category": "skill"
     },
     {
       "name": "good-look-progress",
       "source": "./plugins/good-look-progress",
-      "description": "Mod: progress bar above the prompt and a live agents panel; made for good-look-flow, shows any subagents.",
-      "version": "1.0.0",
+      "description": "Mod: progress bar above the prompt and a live agents panel, in Claude, ChatGPT Dark or WebStorm Islands Dark colors; made for good-look-flow, shows any subagents.",
+      "version": "1.1.0",
       "category": "mod"
+    },
+    {
+      "name": "good-look-themes",
+      "source": "./plugins/good-look-themes",
+      "description": "Themes: ChatGPT Dark and WebStorm Islands Dark color themes for Claude Code, picked in /theme.",
+      "version": "1.0.0",
+      "category": "theme"
     }
   ]
 }
