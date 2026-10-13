@@ -1,0 +1,13 @@
+{
+  "name": "aura-hud",
+  "version": "1.0.0",
+  "description": "Progress bar above the prompt for /flow, plus an agents panel that opens when subagents start: running, finished and planned subagents with model, task progress, context, cost and time. Palettes: Claude, ChatGPT Dark, WebStorm Islands Dark (/look).",
+  "author": {
+    "name": "AlDAani",
+    "url": "https://github.com/AlDAani"
+  },
+  "types": "./types/index.d.ts",
+  "homepage": "https://github.com/AlDAani/claude-aura/tree/main/plugins/aura-hud",
+  "repository": "https://github.com/AlDAani/claude-aura",
+  "license": "MIT"
+}

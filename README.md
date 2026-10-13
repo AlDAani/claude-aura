@@ -1,14 +1,23 @@
-# claude-good-look
+# claude-aura
 
-Skins for [Claude Code](https://claude.com/claude-code): mods that change how it looks, plus the skills they pair with. Every item is a standalone plugin under `plugins/`: install only what you need.
+Claude Aura: upgrades for [Claude Code](https://claude.com/claude-code) — agent orchestration, a live progress HUD and color themes. Every item is a standalone plugin under `plugins/`: install only what you need.
 
 | Plugin | Type | What it does |
 | --- | --- | --- |
-| [good-look-flow](plugins/good-look-flow) | skill + agents | `/good-look-flow <task>`: the session model plans, delegates to tiered worker subagents and reviews their work. |
-| [good-look-progress](plugins/good-look-progress) | mod | A progress bar above the prompt and a live agents panel, in Claude, ChatGPT Dark or WebStorm Islands Dark colors (`/look`). Made for good-look-flow, shows any subagents. |
-| [good-look-themes](plugins/good-look-themes) | themes | ChatGPT Dark and WebStorm Islands Dark color themes for Claude Code, picked in `/theme`. |
+| [aura-flow](plugins/aura-flow) | skill + agents | `/flow <task>`: the session model plans, delegates to tiered worker subagents and reviews their work. |
+| [aura-hud](plugins/aura-hud) | mod | A progress bar above the prompt and a live agents panel, in Claude, ChatGPT Dark or WebStorm Islands Dark colors (`/look`). Made for aura-flow, shows any subagents. |
+| [aura-themes](plugins/aura-themes) | themes | ChatGPT Dark and WebStorm Islands Dark color themes for Claude Code, picked in `/theme`. |
 
-good-look-flow and good-look-progress work on their own and light up together: with both installed, the flow drives the bar and workers report their progress to the panel. good-look-themes recolors Claude Code itself, and `/look` in good-look-progress switches the theme and the panel together.
+aura-flow and aura-hud work on their own and light up together: with both installed, the flow drives the bar and workers report their progress to the panel. aura-themes recolors Claude Code itself, and `/look` in aura-hud switches the theme and the panel together.
+
+## Commands
+
+| Command | What it does |
+| --- | --- |
+| `/flow <task>` | Plans the task, hands it to tiered worker agents and reviews what they return. The full name is `/aura-flow:flow`, for when another command already uses `/flow`. |
+| `/look [auto\|claude\|chatgpt\|webstorm]` | Picks the colors of the progress bar and the agents panel, and with aura-themes installed the Claude Code theme too. Without an argument it shows the current choice. |
+
+The agents panel needs no command: it opens by itself when subagents start working, and the crew button on the progress bar shows or hides it.
 
 ## Install
 
@@ -17,40 +26,40 @@ good-look-flow and good-look-progress work on their own and light up together: w
 In Claude Code:
 
 ```
-/plugin marketplace add AlDAani/claude-good-look
-/plugin install good-look-flow@claude-good-look
-/plugin install good-look-progress@claude-good-look
-/plugin install good-look-themes@claude-good-look
+/plugin marketplace add AlDAani/claude-aura
+/plugin install aura-flow@claude-aura
+/plugin install aura-hud@claude-aura
+/plugin install aura-themes@claude-aura
 ```
 
 In the Claude desktop app `/plugin` opens the plugin browser instead; install from a terminal there:
 
 ```bash
-claude plugin install good-look-progress --marketplace AlDAani/claude-good-look
+claude plugin install aura-hud --marketplace AlDAani/claude-aura
 ```
 
-Restart the session afterwards. Plugin skills and agents are namespaced: the skill is `/good-look-flow:good-look-flow`, the agents `good-look-flow:good-look-careful` and so on.
+Restart the session afterwards.
 
 ### By hand
 
 ```bash
-git clone https://github.com/AlDAani/claude-good-look.git ~/claude-good-look
+git clone https://github.com/AlDAani/claude-aura.git ~/claude-aura
 ```
 
-**A skill** (no plugin system involved, names stay short: `/good-look-flow`, `good-look-careful`): copy its folders into your Claude Code config.
+**A skill** (no plugin system involved, names stay short: `/flow`, `aura-careful`): copy its folders into your Claude Code config.
 
 ```bash
-cp -R ~/claude-good-look/plugins/good-look-flow/skills/good-look-flow ~/.claude/skills/
+cp -R ~/claude-aura/plugins/aura-flow/skills/flow ~/.claude/skills/
 ```
 
 ```bash
-cp ~/claude-good-look/plugins/good-look-flow/agents/*.md ~/.claude/agents/
+cp ~/claude-aura/plugins/aura-flow/agents/*.md ~/.claude/agents/
 ```
 
 **A mod**: load the folder for one session,
 
 ```bash
-claude --plugin-dir ~/claude-good-look/plugins/good-look-progress
+claude --plugin-dir ~/claude-aura/plugins/aura-hud
 ```
 
 or for every session (including the desktop app) through `env` in `~/.claude/settings.json`. Several folders are separated with `:`; if the variable is already set, append to it rather than replacing it:
@@ -58,7 +67,7 @@ or for every session (including the desktop app) through `env` in `~/.claude/set
 ```json
 {
   "env": {
-    "CLAUDE_CODE_PLUGIN_DIRS": "~/claude-good-look/plugins/good-look-progress"
+    "CLAUDE_CODE_PLUGIN_DIRS": "~/claude-aura/plugins/aura-hud"
   }
 }
 ```
