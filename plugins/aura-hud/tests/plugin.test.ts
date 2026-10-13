@@ -67,6 +67,7 @@ test('/look chatgpt repaints and switches the terminal theme; /look claude puts 
   let theme = 'light'
   mock.clock(on, { now: 1_000 })
   mock.store(on)
+  on('ui.open', () => PLACED)
   on('config.list', () => ({
     value: [
       {
@@ -94,6 +95,40 @@ test('/look chatgpt repaints and switches the terminal theme; /look claude puts 
   expect((await look('claude')).text).toContain('back to light')
   expect(theme).toBe('light')
   expect((await look('neon')).text).toContain('Unknown look')
+})
+
+test('/look shows the palette in the panel and points to /theme when the session lists no aura theme', async ($, on) => {
+  const opened: string[] = []
+  let theme = 'dark'
+  mock.clock(on, { now: 1_000 })
+  mock.store(on)
+  on('ui.open', (_engine, e) => {
+    opened.push(e.id)
+    return PLACED
+  })
+  on('config.list', () => ({
+    value: [
+      {
+        key: 'theme',
+        label: 'Theme',
+        kind: 'choice',
+        value: theme,
+        options: ['auto', 'dark', 'light', 'light-daltonized', 'dark-daltonized', 'light-ansi', 'dark-ansi'],
+        provider: { plugin: 'engine', tier: 'core' },
+        isLocked: false,
+      },
+    ],
+  }))
+  on('config.set', (_engine, e) => {
+    theme = String(e.value)
+    return { value: e.value }
+  })
+  const answer = await $.command.run({ ...COMMAND, command: 'look', args: 'chatgpt' })
+  expect(answer.text).toContain('Panel palette: ChatGPT Dark')
+  expect(answer.text).toContain('pick ChatGPT Dark in /theme')
+  expect(answer.text).not.toContain('Install')
+  expect(theme).toBe('dark')
+  expect(opened).toEqual([PANE])
 })
 
 test('a finished worker stops counting as running', async ($, on) => {

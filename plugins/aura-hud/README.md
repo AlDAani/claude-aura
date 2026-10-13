@@ -20,7 +20,7 @@ A Claude Code mod: a progress bar above the prompt and a live panel of subagents
 | `chatgpt` | ChatGPT Dark: neutral greys and a white accent. |
 | `webstorm` | WebStorm Islands Dark: a blue accent and WebStorm's syntax colors for the tiers. |
 
-Each palette has a light and a dark variant that follow the system appearance. With aura-themes installed, `/look chatgpt` and `/look webstorm` also switch the Claude Code theme, and `/look claude` brings back the theme you had before.
+Each palette has a light and a dark variant that follow the system appearance. Setting a palette opens the agents panel so you can see it. `/look chatgpt` and `/look webstorm` also switch the Claude Code theme where the session lists the [aura-themes](../aura-themes) themes in its theme setting, and `/look claude` then brings back the theme you had before; elsewhere `/look` says to pick the theme in `/theme` in a terminal. The Claude desktop app keeps its own colors either way.
 
 ## Tools it adds
 

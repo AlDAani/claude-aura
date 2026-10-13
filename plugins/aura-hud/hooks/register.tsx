@@ -105,7 +105,7 @@ async function syncTheme($: EngineInterface, setting: LookSetting): Promise<stri
   if (setting === 'chatgpt' || setting === 'webstorm') {
     const target = THEME_OF[setting]
     if (current === target) return ''
-    if (!row.options?.includes(target)) return S.themeMissing
+    if (!row.options?.includes(target)) return S.themePick(paletteOf(setting).name)
     if (!isOurs) await $.store.set(PREVIOUS_THEME_KEY, current)
     const { deny } = await $.config.set({ key: 'theme', value: target })
     return deny ? S.themeKept(deny) : S.themeSet(paletteOf(setting).name)
@@ -125,7 +125,11 @@ async function setLook($: EngineInterface, args: string): Promise<string> {
   if (!isLookSetting(arg)) return S.lookUnknown(arg)
   await $.store.set(LOOK_KEY, arg)
   const note = await syncTheme($, arg).catch(() => '')
-  return S.lookSet(paletteOf(await refreshLook($)).name) + note
+  const name = paletteOf(await refreshLook($)).name
+  const at = await $.clock.now()
+  await update($, now, () => at)
+  await $.ui.open({ id: PANE, title: S.pane }).catch(() => undefined)
+  return S.lookSet(name) + note
 }
 
 export const register: Register = on => {

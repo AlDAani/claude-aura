@@ -8,14 +8,14 @@ Claude Aura: upgrades for [Claude Code](https://claude.com/claude-code) — agen
 | [aura-hud](plugins/aura-hud) | mod | A progress bar above the prompt and a live agents panel, in Claude, ChatGPT Dark or WebStorm Islands Dark colors (`/look`). Made for aura-flow, shows any subagents. |
 | [aura-themes](plugins/aura-themes) | themes | ChatGPT Dark and WebStorm Islands Dark color themes for Claude Code, picked in `/theme`. |
 
-aura-flow and aura-hud work on their own and light up together: with both installed, the flow drives the bar and workers report their progress to the panel. aura-themes recolors Claude Code itself, and `/look` in aura-hud switches the theme and the panel together.
+aura-flow and aura-hud work on their own and light up together: with both installed, the flow drives the bar and workers report their progress to the panel. aura-themes recolors Claude Code itself in a terminal: pick its themes in `/theme`.
 
 ## Commands
 
 | Command | What it does |
 | --- | --- |
 | `/flow <task>` | Plans the task, hands it to tiered worker agents and reviews what they return. The full name is `/aura-flow:flow`, for when another command already uses `/flow`. |
-| `/look [auto\|claude\|chatgpt\|webstorm]` | Picks the colors of the progress bar and the agents panel, and with aura-themes installed the Claude Code theme too. Without an argument it shows the current choice. |
+| `/look [auto\|claude\|chatgpt\|webstorm]` | Picks the colors of the progress bar and the agents panel and opens the panel to show them. Where the session lists the aura-themes themes in its theme setting, it switches the Claude Code theme too; otherwise pick that theme in `/theme` in a terminal. Without an argument it shows the current choice. |
 
 The agents panel needs no command: it opens by itself when subagents start working, and the crew button on the progress bar shows or hides it.
 

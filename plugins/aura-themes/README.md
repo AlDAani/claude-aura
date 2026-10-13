@@ -13,6 +13,6 @@ Install the plugin, then pick a theme in `/theme`. Both themes show under their 
 
 A theme recolors Claude Code's own text, borders, diffs and message backgrounds. The window background stays your terminal's, so for the full look set the terminal background to `#212121` for ChatGPT Dark or `#191a1c` for WebStorm Islands Dark.
 
-The Claude desktop app does not apply Claude Code themes yet. There, [aura-hud](../aura-hud) carries the same two palettes for its progress bar and agents panel: `/look chatgpt` or `/look webstorm`. With both plugins installed, `/look` switches the theme and the panel together.
+The Claude desktop app does not apply Claude Code themes yet. There, [aura-hud](../aura-hud) carries the same two palettes for its progress bar and agents panel: `/look chatgpt` or `/look webstorm`.
 
 The plugin holds two JSON theme files and nothing else: it runs no code and sends nothing anywhere.
