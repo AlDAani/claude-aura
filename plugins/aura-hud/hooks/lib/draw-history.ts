@@ -3,7 +3,7 @@ import type { Look, Tier } from '../../types'
 import { LIVE, svg } from './draw-pane'
 import { capText, fitMono, fitText, textWidth, xml } from './format'
 import type { ToolItem } from './history'
-import { paletteCss, paletteOf, tierClass } from './palette'
+import { inkCss, paletteOf, tierClass } from './palette'
 import type { InkClass } from './palette'
 
 const ROW = 24
@@ -123,9 +123,9 @@ export const toolsSvg = (W: number, items: readonly ToolItem[], tier: Tier, look
     y += rowHeight(it)
     return row
   })
-  const css = paletteCss(paletteOf(lookId), TOOL_INK, [tier]) + MONO + (items.some(it => it.state === 'running') ? LIVE : '')
-  const rail = `<line class="ln" x1="${RAIL_X}" y1="0" x2="${RAIL_X}" y2="${H}"/>`
-  const out = svg(W, H, css, rail + rows.join(''))
+  const body = `<line class="ln" x1="${RAIL_X}" y1="0" x2="${RAIL_X}" y2="${H}"/>` + rows.join('')
+  const css = inkCss(paletteOf(lookId), body, TOOL_INK, [tier]) + (body.includes(' mono') ? MONO : '') + (items.some(it => it.state === 'running') ? LIVE : '')
+  const out = svg(W, H, css, body)
   const byKey = memo.get(items) ?? new Map<string, string>()
   byKey.set(key, out)
   memo.set(items, byKey)

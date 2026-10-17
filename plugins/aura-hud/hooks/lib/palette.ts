@@ -203,4 +203,16 @@ export const paletteCss = (p: Palette, classes: readonly InkClass[], tiers: read
   return css
 }
 
+const CLASS_ATTR = /class="([^"]+)"/g
+
+export const inkCss = (p: Palette, body: string, classes: readonly InkClass[], tiers: readonly Tier[] = []): string => {
+  const used = new Set<string>()
+  for (const m of body.matchAll(CLASS_ATTR)) for (const name of (m[1] ?? '').split(' ')) used.add(name)
+  return paletteCss(
+    p,
+    classes.filter(c => used.has(c)),
+    tiers.filter(t => used.has(TIER_CLASS[t])),
+  )
+}
+
 export const tierHex = (p: Palette, tier: Tier): string => p.dark.tiers[tier]

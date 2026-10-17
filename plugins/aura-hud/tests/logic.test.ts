@@ -5,7 +5,7 @@ import type { SessionMessage } from 'claude-code'
 import type { AgentRun } from '../types'
 
 import { importedCostumes } from '../hooks/lib/generated-costumes'
-import { agentSvg, compactSvg, DONE_H, headerHeight, headerSvg, paneWidth, plannedSvg, ROW_H, rowCrabSvg, rowDetailsSvg, rowHeightOf } from '../hooks/lib/draw-pane'
+import { bodyHeightOf, compactSvg, DONE_H, headerHeight, headerSvg, paneWidth, plannedSvg, ROW_H, rowCrabSvg, rowDetailsSvg, rowHeightOf } from '../hooks/lib/draw-pane'
 import { blank, label, merge, readProgress, readStep } from '../hooks/lib/flow'
 import { fitText, textWidth } from '../hooks/lib/format'
 import { toolsHeight, toolsSvg } from '../hooks/lib/draw-history'
@@ -138,21 +138,21 @@ describe('labels and crew', () => {
 describe('drawing', () => {
   test('agent rows are small and cached', () => {
     const a = run({ status: 'done', endedAt: 5_000 })
-    const first = agentSvg(600, a, 9_000, 'chatgpt')
+    const first = rowDetailsSvg(558, a, 9_000, 'chatgpt')
     expect(first.length).toBeLessThan(6_000)
-    expect(agentSvg(600, a, 12_000, 'chatgpt')).toBe(first)
+    expect(rowDetailsSvg(558, a, 12_000, 'chatgpt')).toBe(first)
   })
 
   test('a finished run drops its last step report, a failed one keeps it', () => {
     const reported = { stepDone: 4, stepTotal: 6, stepNote: 'Run verify', endedAt: 5_000 }
-    expect(agentSvg(600, run({ ...reported, status: 'done' }), 9_000, 'claude')).not.toContain('4/6')
-    expect(agentSvg(600, run({ ...reported, status: 'failed' }), 9_000, 'claude')).toContain('4/6 · Run verify')
-    expect(agentSvg(600, run({ ...reported, status: 'running', endedAt: undefined }), 9_000, 'claude')).toContain('4/6 · Run verify')
+    expect(rowDetailsSvg(558, run({ ...reported, status: 'done' }), 9_000, 'claude')).not.toContain('4/6')
+    expect(rowDetailsSvg(558, run({ ...reported, status: 'failed' }), 9_000, 'claude')).toContain('4/6 · Run verify')
+    expect(rowDetailsSvg(558, run({ ...reported, status: 'running', endedAt: undefined }), 9_000, 'claude')).toContain('4/6 · Run verify')
   })
 
   test('a still crab carries no animation css', () => {
-    expect(agentSvg(600, run({ status: 'done', endedAt: 5_000 }), 9_000, 'claude')).not.toContain('@keyframes st')
-    expect(agentSvg(600, run({}), 9_000, 'claude')).toContain('@keyframes st')
+    expect(rowCrabSvg(run({ status: 'done', endedAt: 5_000 }), 'claude')).not.toContain('@keyframes st')
+    expect(rowCrabSvg(run({}), 'claude')).toContain('@keyframes st')
   })
 
   test('imported art uses safe runtime bounds and keeps the canonical crab plus its tier CSS', () => {
@@ -172,9 +172,25 @@ describe('drawing', () => {
       expect(accents).toBeGreaterThanOrEqual(2)
       expect(accents).toBeLessThanOrEqual(12)
     }
-    const icon = rowCrabSvg(run({ model: 'claude-fable-5-1', costume: 'fable-wizard' }), 'claude')
+    const icon = rowCrabSvg(run({ type: 'general-purpose', model: 'claude-fable-5-1', costume: 'fable-wizard' }), 'claude')
     expect(icon).toContain('M7 10h16v12h-16z')
     expect(icon).toContain('.tf{fill:')
+  })
+
+  test('the costume accent of a worker wears its own tier colour', () => {
+    const worker = rowCrabSvg(run({ type: 'aura-flow:aura-careful', model: 'claude-fable-5-1', costume: 'fable-wizard' }), 'claude')
+    expect(worker).toContain('<path class="tc"')
+    expect(worker).toContain('.tc{fill:')
+    expect(worker).not.toContain('.tf{fill:')
+  })
+
+  test('each drawing carries only the colour rules it uses', () => {
+    const finished = rowDetailsSvg(500, run({ status: 'done', endedAt: 5_000 }), 9_000, 'claude')
+    expect(finished).not.toContain('.k{')
+    expect(finished).not.toContain('.no{')
+    expect(finished).not.toContain('.er{')
+    expect(finished).toContain('.ok{')
+    expect(rowCrabSvg(run({ status: 'done', endedAt: 5_000 }), 'claude')).not.toContain('font-family')
   })
 
   test('the header adds a session tile once the session total is known', () => {
@@ -229,28 +245,28 @@ describe('drawing', () => {
   })
 
   test('a bar shows real progress only', () => {
-    const stepped = agentSvg(600, run({ stepDone: 2, stepTotal: 5 }), 9_000, 'claude')
-    expect(stepped).toContain('class="tc" x="42" y="55" width="')
+    const stepped = rowDetailsSvg(558, run({ stepDone: 2, stepTotal: 5 }), 9_000, 'claude')
+    expect(stepped).toContain('class="tc" x="0" y="33" width="')
     expect(rowHeightOf(run({ stepDone: 2, stepTotal: 5 }))).toBe(ROW_H)
-    const working = agentSvg(600, run({ type: 'general-purpose' }), 9_000, 'claude')
+    const working = rowDetailsSvg(558, run({ type: 'general-purpose' }), 9_000, 'claude')
     expect(working).not.toContain('class="k"')
     expect(working).not.toContain('@keyframes sl')
-    expect(working).toContain(`height="${DONE_H}"`)
+    expect(working).toContain(`height="${bodyHeightOf(run({ type: 'general-purpose' }))}"`)
     for (const status of ['done', 'failed'] as const) {
-      const over = agentSvg(600, run({ status, endedAt: 5_000, stepDone: 4, stepTotal: 6 }), 9_000, 'claude')
+      const over = rowDetailsSvg(558, run({ status, endedAt: 5_000, stepDone: 4, stepTotal: 6 }), 9_000, 'claude')
       expect(over).not.toContain('class="k"')
-      expect(over).toContain(`height="${DONE_H}"`)
+      expect(over).toContain(`height="${bodyHeightOf(run({ status }))}"`)
       expect(rowHeightOf(run({ status }))).toBe(DONE_H)
     }
     expect(rowHeightOf(run({}))).toBe(DONE_H)
   })
 
-  test('motion follows the clock, so a redraw every second never restarts it', () => {
-    const working = run({ type: 'general-purpose' })
+  test('a redraw with the same numbers keeps the drawing, and a new one picks up the pulse where the clock is', () => {
+    const working = run({ id: 'pulse', agentId: 'pulse', type: 'general-purpose' })
     const first = rowDetailsSvg(500, working, 10_000, 'claude')
-    const later = rowDetailsSvg(500, working, 11_000, 'claude')
     expect(first).toContain('animation-delay:-0.400s')
-    expect(later).toContain('animation-delay:-1.400s')
+    expect(rowDetailsSvg(500, working, 11_000, 'claude')).toBe(first)
+    expect(rowDetailsSvg(500, { ...working, costUsd: 5 }, 11_000, 'claude')).toContain('animation-delay:-1.400s')
     expect(rowCrabSvg(working, 'claude')).toBe(rowCrabSvg({ ...working, costUsd: 9, steps: 99 }, 'claude'))
     expect(rowCrabSvg(working, 'claude')).toContain('.run .la{animation')
   })
@@ -267,12 +283,12 @@ describe('drawing', () => {
   })
 
   test('a running agent of any type shows a live dot, a failed one says so in red', () => {
-    expect(agentSvg(600, run({ type: 'general-purpose' }), 9_000, 'claude')).toContain('class="live s"')
-    expect(agentSvg(600, run({ status: 'failed', endedAt: 5_000 }), 9_000, 'claude')).toContain('<tspan class="er"> · failed</tspan>')
+    expect(rowDetailsSvg(558, run({ type: 'general-purpose' }), 9_000, 'claude')).toContain('class="live s"')
+    expect(rowDetailsSvg(558, run({ status: 'failed', endedAt: 5_000 }), 9_000, 'claude')).toContain('<tspan class="er"> · failed</tspan>')
   })
 
   test('row text uses one separator and no duplicate context figure', () => {
-    const row = agentSvg(600, run({ effort: 'high', contextTokens: 120_000 }), 9_000, 'claude')
+    const row = rowDetailsSvg(558, run({ effort: 'high', contextTokens: 120_000 }), 9_000, 'claude')
     expect(row).toContain('<tspan class="s"> · Opus 5.5 · high</tspan>')
     expect(row).toContain('ctx 12% · ≈$0.42<')
     expect(row).not.toContain('120k')

@@ -11,14 +11,30 @@ const TIER = 'tier'
 type Fill = (x: number, y: number, w: number, h: number, color: string, group?: string) => void
 type Draw = (f: Fill) => void
 
+type Rect = { x: number; y: number; w: number; h: number }
+
+const mergedRuns = (runs: string): Rect[] => {
+  const rects = runs
+    .split(' ')
+    .map(run => {
+      const [x = 0, y = 0, w = 0] = run.split(',').map(Number)
+      return { x, y, w, h: 1 }
+    })
+    .sort((a, b) => a.x - b.x || a.w - b.w || a.y - b.y)
+  const merged: Rect[] = []
+  for (const rect of rects) {
+    const last = merged.at(-1)
+    if (last && last.x === rect.x && last.w === rect.w && last.y + last.h === rect.y) last.h += 1
+    else merged.push({ ...rect })
+  }
+  return merged
+}
+
 const drawImported = (f: Fill, name: string): void => {
   const art = importedCostumes[name]
   if (!art) return
   for (const [color, runs] of art) {
-    for (const run of runs.split(' ')) {
-      const [x, y, width] = run.split(',').map(Number)
-      f(x ?? 0, y ?? 0, width ?? 0, 1, color === '#00ffff' ? TIER : color)
-    }
+    for (const r of mergedRuns(runs)) f(r.x, r.y, r.w, r.h, color === '#00ffff' ? TIER : color)
   }
 }
 
@@ -199,10 +215,11 @@ export const tierOfCostume = (costume: Costume): Tier => {
 
 type Layer = Map<string, string[]>
 
-const innerCache = new Map<Costume, string>()
+const innerCache = new Map<string, string>()
 
-const innerOf = (costume: Costume): string => {
-  const hit = innerCache.get(costume)
+const innerOf = (costume: Costume, accent: Tier): string => {
+  const cacheKey = `${costume}|${accent}`
+  const hit = innerCache.get(cacheKey)
   if (hit !== undefined) return hit
   const groups = new Map<string, Layer>([['bd', new Map()]])
   const f: Fill = (x, y, w, h, color, group = 'bd') => {
@@ -214,7 +231,7 @@ const innerOf = (costume: Costume): string => {
   }
   const draw = COSTUMES.get(costume) ?? crabBody
   draw(f)
-  const tier = tierClass(tierOfCostume(costume))
+  const tier = tierClass(accent)
   const paint = (name: string): string =>
     [...(groups.get(name) ?? new Map<string, string[]>())]
       .map(([color, segs]) => `<path ${color === TIER ? `class="${tier}"` : `fill="${color}"`} d="${segs.join('')}"/>`)
@@ -222,13 +239,21 @@ const innerOf = (costume: Costume): string => {
   const group = (name: string): string => `<g class="${name}">${paint(name)}</g>`
   const props = [...groups.keys()].filter(k => k !== 'bd' && k !== 'la' && k !== 'lb')
   const inner = `<g class="bd">${paint('bd')}${props.map(group).join('')}</g>${group('la')}${group('lb')}`
-  innerCache.set(costume, inner)
+  innerCache.set(cacheKey, inner)
   return inner
 }
 
-export const crab = (x: number, y: number, costume: Costume, isDim: boolean, isWalking: boolean, scale: number): string =>
+export const crab = (
+  x: number,
+  y: number,
+  costume: Costume,
+  isDim: boolean,
+  isWalking: boolean,
+  scale: number,
+  accent: Tier = tierOfCostume(costume),
+): string =>
   `<g transform="translate(${x},${y}) scale(${scale})"${isDim ? ' opacity="0.45"' : ''} shape-rendering="crispEdges">` +
-  `<g class="c-${costume}${isWalking ? ' run' : ''}">${innerOf(costume)}</g></g>`
+  `<g class="c-${costume}${isWalking ? ' run' : ''}">${innerOf(costume, accent)}</g></g>`
 
 const WALK =
   '.run{animation:hop 1s cubic-bezier(.3,0,.3,1) infinite}' +

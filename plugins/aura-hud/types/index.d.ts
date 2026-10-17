@@ -65,7 +65,6 @@ declare module 'claude-code' {
       agents: AgentRun[]
       crew: Crew
       panel: Panel
-      now: number
       look: Look
       total: number | null
       context: number | null

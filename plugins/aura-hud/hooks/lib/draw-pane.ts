@@ -3,7 +3,7 @@ import type { AgentRun, AgentStatus, Look, Tier } from '../../types'
 import { crab, crabCss, tierOfCostume } from './crab'
 import { fitText, fmtCost, fmtTokens, fmtUsd, textWidth, xml } from './format'
 import { modelName } from './model'
-import { paletteCss, paletteOf, tierClass } from './palette'
+import { inkCss, paletteOf, tierClass } from './palette'
 import type { InkClass } from './palette'
 import type { Costume, Planned, Totals } from './runs'
 import { costumeOf, ctxOf, progressOf, showsSteps, tierOf } from './runs'
@@ -55,8 +55,17 @@ const remember = (key: string, value: string): string => {
   return value
 }
 
-export const svg = (W: number, H: number, css: string, body: string): string =>
-  `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}"><style>${TEXT_CSS}${css}</style>${body}</svg>`
+export const svg = (W: number, H: number, css: string, body: string): string => {
+  const style = (body.includes('<text') ? TEXT_CSS : '') + css
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">${style ? `<style>${style}</style>` : ''}${body}</svg>`
+}
+
+const ALL_TIERS: readonly Tier[] = ['fable', 'heavy', 'careful', 'medium', 'light', 'other']
+
+const accentOf = (type: string, costume: Costume): Tier => {
+  const tier = tierOf(type)
+  return tier === 'other' ? tierOfCostume(costume) : tier
+}
 
 const liveClass = (tier: Tier): string => (tier === 'other' ? 's' : tierClass(tier))
 
@@ -74,7 +83,7 @@ const statusMark = (x: number, y: number, status: AgentStatus | 'planned', tier:
 
 const tilesOf = (t: Totals, total: number | null, context: number | null): (readonly [string, string])[] => {
   const tiles: (readonly [string, string])[] = [
-    [S.cost, '≈' + fmtCost(t.cost)],
+    [S.cost, '≈' + fmtUsd(t.cost)],
     [S.tokens, fmtTokens(t.tokens)],
   ]
   if (total !== null) tiles.push([S.session, fmtUsd(total)])
@@ -96,7 +105,7 @@ const valueSize = (value: string, maxW: number): number =>
   Math.floor(Math.max(10, Math.min(VALUE_SIZE, (VALUE_SIZE * maxW) / Math.max(1, textWidth(value, VALUE_SIZE)))) * 2) / 2
 
 export const totalsText = (t: Totals, total: number | null, context: number | null): string =>
-  `≈${fmtCost(t.cost)} · ${fmtTokens(t.tokens)}` +
+  `≈${fmtUsd(t.cost)} · ${fmtTokens(t.tokens)}` +
   (total === null ? '' : ` · ${S.sessionWord} ${fmtUsd(total)}`) +
   (context === null ? '' : ` · ${S.contextWord} ${context}%`)
 
@@ -117,7 +126,8 @@ export const headerSvg = (W: number, title: string, t: Totals, total: number | n
   const head = title
     ? `<text class="t" x="0" y="15" font-size="14" font-weight="600">${xml(fitText(title, 14, W))}</text>`
     : ''
-  return svg(W, headerHeight(W, title, total, context), paletteCss(paletteOf(lookId), HEADER_INK), head + tiles.map(tile).join(''))
+  const body = head + tiles.map(tile).join('')
+  return svg(W, headerHeight(W, title, total, context), inkCss(paletteOf(lookId), body, HEADER_INK), body)
 }
 
 const hasBar = (a: AgentRun): boolean => a.status === 'running' && progressOf(a) !== null
@@ -160,51 +170,32 @@ const detailsOf = (x0: number, y0: number, textW: number, a: AgentRun, at: numbe
   return { svg: svgText, css }
 }
 
-const runKey = (kind: string, W: number, a: AgentRun, at: number, lookId: Look): string =>
+const runKey = (kind: string, W: number, a: AgentRun, lookId: Look): string =>
   [kind, lookId, W, a.id, a.status, a.type, a.description, a.model, a.costume, a.effort, a.round, a.stepDone, a.stepTotal, a.stepNote]
-    .concat([ctxOf(a), fmtCost(a.costUsd), progressOf(a) ?? '', a.status === 'running' ? at : ''])
+    .concat([ctxOf(a), fmtCost(a.costUsd), progressOf(a) ?? ''])
     .join(SEP)
-
-export const agentSvg = (W: number, a: AgentRun, at: number, lookId: Look): string => {
-  const key = runKey('row', W, a, at, lookId)
-  const hit = cache.get(key)
-  if (hit !== undefined) return hit
-  const tier = tierOf(a.type)
-  const textW = W - CRAB_W - 22
-  const isRunning = a.status === 'running'
-  const H = rowHeightOf(a)
-  const costume = costumeOf(a.type, a.model, a.id, a.costume)
-  const part = detailsOf(CRAB_W, 22, textW, a, at, tier)
-  const css = paletteCss(paletteOf(lookId), ROW_INK, [tier, tierOfCostume(costume)]) + (isRunning ? crabCss([costume]) : '') + part.css
-  const body =
-    crab(0, isRunning ? 14 : 10, costume, false, isRunning, CRAB_SCALE) +
-    `<text class="t" x="${CRAB_W}" y="18" font-size="13" font-weight="600">${xml(fitText(a.description || a.type, 13, textW))}</text>` +
-    part.svg +
-    statusMark(W - 8, 16, a.status, tier) +
-    `<line class="ln" x1="0" y1="${H - 0.5}" x2="${W}" y2="${H - 0.5}"/>`
-  return remember(key, svg(W, H, css, body))
-}
 
 export const rowCrabSvg = (a: AgentRun, lookId: Look): string => {
   const isRunning = a.status === 'running'
   const costume = costumeOf(a.type, a.model, a.id, a.costume)
   const H = rowHeightOf(a)
-  const key = ['crab', lookId, costume, isRunning, H].join(SEP)
+  const accent = accentOf(a.type, costume)
+  const key = ['crab', lookId, costume, accent, isRunning, H].join(SEP)
   const hit = cache.get(key)
   if (hit !== undefined) return hit
-  const css = paletteCss(paletteOf(lookId), [], [tierOfCostume(costume)]) + (isRunning ? crabCss([costume]) : '')
-  return remember(key, svg(CRAB_W, H, css, crab(0, Math.round((H - CRAB_SPRITE_H) / 2) - 2, costume, false, isRunning, CRAB_SCALE)))
+  const body = crab(0, Math.round((H - CRAB_SPRITE_H) / 2) - 2, costume, false, isRunning, CRAB_SCALE, accent)
+  return remember(key, svg(CRAB_W, H, inkCss(paletteOf(lookId), body, [], ALL_TIERS) + (isRunning ? crabCss([costume]) : ''), body))
 }
 
 export const rowDetailsSvg = (W: number, a: AgentRun, at: number, lookId: Look): string => {
-  const key = runKey('details', W, a, at, lookId)
+  const key = runKey('details', W, a, lookId)
   const hit = cache.get(key)
   if (hit !== undefined) return hit
   const tier = tierOf(a.type)
   const H = bodyHeightOf(a)
   const part = detailsOf(0, 0, W - 22, a, at, tier)
   const body = part.svg + statusMark(W - 8, 8, a.status, tier) + `<line class="ln" x1="0" y1="${H - 0.5}" x2="${W}" y2="${H - 0.5}"/>`
-  return remember(key, svg(W, H, paletteCss(paletteOf(lookId), ROW_INK, [tier]) + part.css, body))
+  return remember(key, svg(W, H, inkCss(paletteOf(lookId), body, ROW_INK, ALL_TIERS) + part.css, body))
 }
 
 export const plannedSvg = (W: number, pl: Planned, lookId: Look): string => {
@@ -222,10 +213,10 @@ export const plannedSvg = (W: number, pl: Planned, lookId: Look): string => {
     `<tspan class="m"> · ${xml(meta.filter(Boolean).join(' · '))}</tspan></text>` +
     statusMark(W - 8, 16, 'planned', pl.tier) +
     `<line class="ln" x1="0" y1="45.5" x2="${W}" y2="45.5"/>`
-  return remember(key, svg(W, PLANNED_H, paletteCss(paletteOf(lookId), PLANNED_INK, [pl.tier]), body))
+  return remember(key, svg(W, PLANNED_H, inkCss(paletteOf(lookId), body, PLANNED_INK, ALL_TIERS), body))
 }
 
-type Icon = { costume: Costume; tier: Tier; isRunning: boolean; isDim: boolean }
+type Icon = { costume: Costume; tier: Tier; accent: Tier; isRunning: boolean; isDim: boolean }
 
 export const compactSvg = (
   W: number,
@@ -238,41 +229,31 @@ export const compactSvg = (
   at: number,
 ): string => {
   const summary = totalsText(t, total, context)
-  const runIcon = (a: AgentRun): Icon => ({
-    costume: costumeOf(a.type, a.model, a.id, a.costume),
-    tier: tierOf(a.type),
-    isRunning: a.status === 'running',
-    isDim: false,
-  })
+  const runIcon = (a: AgentRun): Icon => {
+    const costume = costumeOf(a.type, a.model, a.id, a.costume)
+    return { costume, tier: tierOf(a.type), accent: accentOf(a.type, costume), isRunning: a.status === 'running', isDim: false }
+  }
   const icons: Icon[] = [
     ...list.filter(a => a.status === 'running').map(runIcon),
     ...list.filter(a => a.status !== 'running').map(runIcon),
-    ...planned.map(pl => ({ costume: pl.tier, tier: pl.tier, isRunning: false, isDim: true })),
+    ...planned.map(pl => ({ costume: pl.tier, tier: pl.tier, accent: pl.tier, isRunning: false, isDim: true })),
   ]
   const fit = Math.max(1, Math.floor((W - textWidth(summary, 12) - 24) / 36))
   const shown = icons.slice(0, fit)
   const more = icons.length - shown.length
   const walking = shown.filter(ic => ic.isRunning)
-  const css =
-    paletteCss(
-      paletteOf(lookId),
-      COMPACT_INK,
-      shown.map(ic => ic.tier),
-    ) + (walking.length ? liveCss(at) + crabCss(walking.map(ic => ic.costume)) : '')
   const body = shown
     .map(
       (ic, i) =>
-        crab(i * 36, 0, ic.costume, ic.isDim, ic.isRunning, CRAB_SCALE) +
+        crab(i * 36, 0, ic.costume, ic.isDim, ic.isRunning, CRAB_SCALE, ic.accent) +
         (ic.isRunning ? `<circle class="live ${liveClass(ic.tier)}" cx="${i * 36 + 32}" cy="4" r="3"/>` : ''),
     )
     .join('')
   const x = shown.length * 36 + (more ? 4 : 0)
-  return svg(
-    W,
-    COMPACT_H,
-    css,
+  const full =
     body +
-      (more ? `<text class="s" x="${x}" y="21" font-size="12">+${more}</text>` : '') +
-      `<text class="s" x="${W}" y="21" text-anchor="end" font-size="12">${xml(summary)}</text>`,
-  )
+    (more ? `<text class="s" x="${x}" y="21" font-size="12">+${more}</text>` : '') +
+    `<text class="s" x="${W}" y="21" text-anchor="end" font-size="12">${xml(summary)}</text>`
+  const css = inkCss(paletteOf(lookId), full, COMPACT_INK, ALL_TIERS) + (walking.length ? liveCss(at) + crabCss(walking.map(ic => ic.costume)) : '')
+  return svg(W, COMPACT_H, css, full)
 }

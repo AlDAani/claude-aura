@@ -23,7 +23,6 @@ const panel = atom({ plugin: 'aura-hud', key: 'panel' } as const, {
   openRun: '',
   isBriefOpen: false,
 })
-const now = atom({ plugin: 'aura-hud', key: 'now' } as const, 0)
 const look = atom({ plugin: 'aura-hud', key: 'look' } as const, 'claude')
 const total = atom({ plugin: 'aura-hud', key: 'total' } as const, null)
 const mainContext = atom({ plugin: 'aura-hud', key: 'context' } as const, null)
@@ -146,8 +145,6 @@ async function setLook($: EngineInterface, args: string): Promise<string> {
   await $.store.set(LOOK_KEY, arg)
   const note = await syncTheme($, arg).catch(() => '')
   const name = paletteOf(await refreshLook($)).name
-  const at = await $.clock.now()
-  await update($, now, () => at)
   await $.ui.open({ id: PANE, title: S.pane }).catch(() => undefined)
   return S.lookSet(name) + note
 }
@@ -260,7 +257,6 @@ export const register: Register = on => {
       await update($, agents, list => addRun(list, e, started, at))
       if (isWorkerType(e.subagentType)) await update($, flow, workerFlow)
       await syncCrew($)
-      await update($, now, () => at)
       if (wasIdle) await autoOpen($, `agents-${at}`)
     })
     return started
@@ -270,7 +266,7 @@ export const register: Register = on => {
     const result = yield* next(e)
     const agentId = e.agentId
     const usage = result.usage
-    if (usage) await quietly(() => syncTotal($))
+    if (usage) void quietly(() => syncTotal($))
     if (!agentId || !usage) return result
     const model = usage.model || e.model || ''
     const effort = typeof e.effort === 'string' ? e.effort : undefined
@@ -294,7 +290,6 @@ export const register: Register = on => {
         const at = await $.clock.now()
         await update($, agents, list => patchRun(list, agentId, a => finishRun(a, e.reason === 'answer', at, e.usage)))
         await syncCrew($)
-        await update($, now, () => at)
       })
     }
     return next(e)
@@ -305,7 +300,7 @@ export const register: Register = on => {
     const list = await read($, agents)
     const p = await read($, panel)
     const lookId = await read($, look)
-    const at = Math.max(await read($, now), ...list.map(a => a.startedAt), 0)
+    const at = await $.clock.now()
     const opened = p.openRun ? list.find(a => a.id === p.openRun) : undefined
     if (opened?.agentId) {
       const found = await historyFor($, opened, opened.agentId).catch(() => '')

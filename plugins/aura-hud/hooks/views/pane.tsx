@@ -26,7 +26,7 @@ import { plural, S } from '../lib/strings'
 
 const STATUS_GLYPH: Readonly<Record<AgentStatus, string>> = { running: '●', done: '✓', failed: '✗' }
 const EXPAND_W = 64
-const TITLE_SIZE = 16
+export const TITLE_SIZE = 16
 
 type Head = 'empty' | 'run' | 'done' | 'plan'
 
@@ -74,7 +74,7 @@ export const paneTree = (ui: Elements[RenderSurface], v: PaneView, act: PaneActi
   const sessionText = [v.total === null ? '' : `${S.sessionWord} ${fmtUsd(v.total)}`, v.context === null ? '' : `${S.contextWord} ${v.context}%`]
     .filter(Boolean)
     .join(' · ')
-  const summary = [`≈${fmtCost(t.cost)}`, `${fmtTokens(t.tokens)} ${plural(t.tokens, 'token', 'tokens')}`, sessionText]
+  const summary = [`≈${fmtUsd(t.cost)}`, `${fmtTokens(t.tokens)} ${plural(t.tokens, 'token', 'tokens')}`, sessionText]
     .filter(Boolean)
     .join(', ')
 
@@ -228,7 +228,7 @@ export const paneTree = (ui: Elements[RenderSurface], v: PaneView, act: PaneActi
         {toggleCompact}
       </Box>
       <Text dimColor>
-        ≈{fmtCost(t.cost)} · {fmtTokens(t.tokens)} {plural(t.tokens, 'token', 'tokens')}
+        ≈{fmtUsd(t.cost)} · {fmtTokens(t.tokens)} {plural(t.tokens, 'token', 'tokens')}
         {sessionText && ` · ${sessionText}`}
       </Text>
       {p.isCompact ? (

@@ -3,12 +3,13 @@ import type { Elements, RenderSurface } from 'claude-code'
 import type { AgentRun, Look } from '../../types'
 
 import { toolsAlt, toolsHeight, toolsSvg } from '../lib/draw-history'
-import { agentSvg, paneWidth, rowHeightOf } from '../lib/draw-pane'
+import { bodyHeightOf, CRAB_W, paneWidth, rowCrabSvg, rowDetailsSvg, rowHeightOf } from '../lib/draw-pane'
+import { fitText } from '../lib/format'
 import { firstLine } from '../lib/history'
 import type { Block, History, ToolItem, ToolState } from '../lib/history'
 import { tierOf } from '../lib/runs'
 import { plural, S } from '../lib/strings'
-import { modelLine, rowAlt, stateWord } from './pane'
+import { modelLine, rowAlt, stateWord, TITLE_SIZE } from './pane'
 
 export type HistoryView = {
   surface: RenderSurface
@@ -93,7 +94,13 @@ export const historyTree = (ui: Elements[RenderSurface], v: HistoryView, act: Hi
   }
 
   const header = svgUi ? (
-    <svgUi.Svg source={agentSvg(W, a, v.at, v.look)} alt={rowAlt(a)} width={W} height={rowHeightOf(a)} />
+    <Box flexDirection="row">
+      <svgUi.Svg source={rowCrabSvg(a, v.look)} alt={`${tier} crab`} width={CRAB_W} height={rowHeightOf(a)} />
+      <Box flexDirection="column" flexGrow={1}>
+        <Text bold>{fitText(a.description || a.type, TITLE_SIZE, W - CRAB_W - 8)}</Text>
+        <svgUi.Svg source={rowDetailsSvg(W - CRAB_W, a, v.at, v.look)} alt={rowAlt(a)} width={W - CRAB_W} height={bodyHeightOf(a)} />
+      </Box>
+    </Box>
   ) : (
     <Box flexDirection="column">
       <Text bold wrap="truncate-end">
