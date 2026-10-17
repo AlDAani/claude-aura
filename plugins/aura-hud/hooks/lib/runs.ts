@@ -36,18 +36,29 @@ export const plannedOf = (f: Flow | null, list: readonly AgentRun[]): Planned[] 
   return tasks.map((t, i) => ({ ...t, n: i + 1 })).filter(t => !started.has(norm(t.title)))
 }
 
+const activeTime = (spans: readonly (readonly [number, number])[]): number => {
+  let time = 0
+  let from = 0
+  let to = -Infinity
+  for (const [start, end] of [...spans].sort((x, y) => x[0] - y[0])) {
+    if (start > to) {
+      if (to > from) time += to - from
+      from = start
+      to = end
+    } else to = Math.max(to, end)
+  }
+  return to > from ? time + to - from : time
+}
+
 export const totalsOf = (list: readonly AgentRun[], at: number): Totals => {
   let cost = 0
   let tokens = 0
-  let start = Infinity
-  let end = -Infinity
   for (const a of list) {
     cost += a.costUsd
     tokens += a.tokens
-    start = Math.min(start, a.startedAt)
-    end = Math.max(end, a.endedAt ?? Math.max(at, a.startedAt))
   }
-  return { cost, tokens, time: list.length ? end - start : 0 }
+  const spans = list.map(a => [a.startedAt, a.endedAt ?? Math.max(at, a.startedAt)] as const)
+  return { cost, tokens, time: activeTime(spans) }
 }
 
 export const progressOf = (a: AgentRun): number | null => {

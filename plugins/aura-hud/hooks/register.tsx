@@ -1,5 +1,5 @@
 import { atom, read, update } from 'claude-code'
-import type { EngineInterface, Register } from 'claude-code'
+import type { EngineInterface, Register, UiScrollBlock, UiScrollTarget } from 'claude-code'
 
 import type { AgentRun, Crew, Look, LookSetting } from '../types'
 
@@ -33,6 +33,7 @@ const PANE = 'aura-agents'
 const LOOK_KEY = 'look'
 const HISTORY_ITEMS = 150
 const HISTORY_CACHE = 24
+const REVEAL_AFTER_MS = 60
 const PREVIOUS_THEME_KEY = 'themeBeforeLook'
 
 const histories = new Map<string, { key: string; found: History | string }>()
@@ -76,6 +77,11 @@ async function historyFor($: EngineInterface, run: AgentRun, agentId: string): P
   if (histories.size >= HISTORY_CACHE) histories.clear()
   histories.set(run.id, { key, found })
   return found
+}
+
+async function reveal($: EngineInterface, to: UiScrollTarget, block: UiScrollBlock): Promise<void> {
+  await $.clock.sleep(REVEAL_AFTER_MS)
+  await $.ui.scroll({ in: PANE, to, block })
 }
 
 async function tick($: EngineInterface): Promise<void> {
@@ -315,7 +321,9 @@ export const register: Register = on => {
           bodyColumns: e.props.bodyColumns,
         },
         {
-          back: () => update($, panel, prev => ({ ...prev, openRun: '' })),
+          back: () => {
+            void update($, panel, prev => ({ ...prev, openRun: '' })).then(() => quietly(() => reveal($, { key: opened.id }, 'center')))
+          },
           toggleBrief: () => update($, panel, prev => ({ ...prev, isBriefOpen: !prev.isBriefOpen })),
         },
       )
@@ -335,7 +343,9 @@ export const register: Register = on => {
       {
         toggleCompact: () => update($, panel, prev => ({ ...prev, isCompact: !prev.isCompact })),
         toggleDone: () => update($, panel, prev => ({ ...prev, isDoneCollapsed: !prev.isDoneCollapsed })),
-        openRun: id => update($, panel, prev => ({ ...prev, openRun: id, isBriefOpen: false })),
+        openRun: id => {
+          void update($, panel, prev => ({ ...prev, openRun: id, isBriefOpen: false })).then(() => quietly(() => reveal($, 'end', 'end')))
+        },
       },
     )
   })

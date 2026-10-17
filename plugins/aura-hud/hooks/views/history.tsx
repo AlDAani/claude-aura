@@ -3,7 +3,7 @@ import type { Elements, RenderSurface } from 'claude-code'
 import type { AgentRun, Look } from '../../types'
 
 import { toolsAlt, toolsHeight, toolsSvg } from '../lib/draw-history'
-import { agentSvg, paneWidth, ROW_H } from '../lib/draw-pane'
+import { agentSvg, paneWidth, rowHeightOf } from '../lib/draw-pane'
 import { firstLine } from '../lib/history'
 import type { Block, History, ToolItem, ToolState } from '../lib/history'
 import { tierOf } from '../lib/runs'
@@ -80,7 +80,7 @@ export const historyTree = (ui: Elements[RenderSurface], v: HistoryView, act: Hi
   }
 
   const header = svgUi ? (
-    <svgUi.Svg source={agentSvg(W, a, v.at, v.look)} alt={rowAlt(a, v.at)} width={W} height={ROW_H} />
+    <svgUi.Svg source={agentSvg(W, a, v.at, v.look)} alt={rowAlt(a, v.at)} width={W} height={rowHeightOf(a)} />
   ) : (
     <Box flexDirection="column">
       <Text bold wrap="truncate-end">

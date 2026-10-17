@@ -4,7 +4,7 @@ import type { SessionMessage } from 'claude-code'
 
 import type { AgentRun } from '../types'
 
-import { agentSvg, compactSvg, headerHeight, headerSvg } from '../hooks/lib/draw-pane'
+import { agentSvg, compactSvg, DONE_H, headerHeight, headerSvg, plannedSvg, ROW_H, rowHeightOf } from '../hooks/lib/draw-pane'
 import { blank, label, merge, readProgress, readStep } from '../hooks/lib/flow'
 import { fitText, textWidth } from '../hooks/lib/format'
 import { toolsHeight, toolsSvg } from '../hooks/lib/draw-history'
@@ -12,7 +12,7 @@ import { historyOf, toolName } from '../hooks/lib/history'
 import type { ToolItem } from '../hooks/lib/history'
 import { ratesOf, windowOf } from '../hooks/lib/model'
 import { lookOfTheme, paletteCss, paletteOf } from '../hooks/lib/palette'
-import { costumeOf, crewOf, tierOf } from '../hooks/lib/runs'
+import { costumeOf, crewOf, tierOf, totalsOf } from '../hooks/lib/runs'
 import { plural } from '../hooks/lib/strings'
 
 const run = (over: Partial<AgentRun>): AgentRun => ({
@@ -147,7 +147,8 @@ describe('drawing', () => {
   test('the header adds a session tile once the session total is known', () => {
     const totals = { cost: 5.16, tokens: 14_500_000, time: 2_503_000 }
     const withTotal = headerSvg(600, 'Aura flow', totals, 250.47, 'claude')
-    expect(withTotal).toContain('>Session<')
+    expect(withTotal).toContain('>Session cost<')
+    expect(withTotal).toContain('>Agent cost<')
     expect(withTotal).toContain('>$250.47<')
     expect(withTotal).toContain('≈$5.16')
     expect(headerSvg(600, 'Aura flow', totals, null, 'claude')).not.toContain('Session')
@@ -178,6 +179,50 @@ describe('drawing', () => {
     expect(strip).toContain('session $250.47')
     const crabs = (svg: string): number => (svg.match(/transform="translate\(/g) ?? []).length
     expect(crabs(strip)).toBeLessThan(crabs(compactSvg(600, runs, [], totals, null, 'claude')))
+  })
+
+  test('a bar shows real progress only', () => {
+    const stepped = agentSvg(600, run({ stepDone: 2, stepTotal: 5 }), 9_000, 'claude')
+    expect(stepped).toContain('class="tc" x="42" y="55" width="')
+    expect(stepped).not.toContain(' sl"')
+    const working = agentSvg(600, run({ type: 'general-purpose' }), 9_000, 'claude')
+    expect(working).toContain('class="s sl"')
+    expect(working).toContain('@keyframes sl')
+    expect(working).toContain('prefers-reduced-motion')
+    for (const status of ['done', 'failed'] as const) {
+      const over = agentSvg(600, run({ status, endedAt: 5_000, stepDone: 4, stepTotal: 6 }), 9_000, 'claude')
+      expect(over).not.toContain('class="k"')
+      expect(over).toContain(`height="${DONE_H}"`)
+      expect(rowHeightOf(run({ status }))).toBe(DONE_H)
+    }
+    expect(rowHeightOf(run({}))).toBe(ROW_H)
+  })
+
+  test('a running agent of any type shows a live dot, a failed one says so in red', () => {
+    expect(agentSvg(600, run({ type: 'general-purpose' }), 9_000, 'claude')).toContain('class="live s"')
+    expect(agentSvg(600, run({ status: 'failed', endedAt: 5_000 }), 9_000, 'claude')).toContain('<tspan class="er"> · failed</tspan>')
+  })
+
+  test('row text uses one separator and no duplicate context figure', () => {
+    const row = agentSvg(600, run({ effort: 'high', contextTokens: 120_000 }), 9_000, 'claude')
+    expect(row).toContain('<tspan class="s"> · Opus 5.5 · high</tspan>')
+    expect(row).toContain('ctx 12% · ≈$0.42 · 0:09')
+    expect(row).not.toContain('120k')
+  })
+
+  test('planned tasks name the effort, not a model the session may override', () => {
+    const planned = plannedSvg(600, { n: 2, title: 'Wire the store', tier: 'heavy', after: [1] }, 'claude')
+    expect(planned).toContain('xhigh effort · after 1')
+    expect(planned).not.toContain('Opus')
+  })
+
+  test('time counts only while agents run, not the gaps between batches', () => {
+    const first = run({ id: 'a', status: 'done', startedAt: 0, endedAt: 60_000 })
+    const second = run({ id: 'b', status: 'done', startedAt: 600_000, endedAt: 660_000 })
+    const overlapping = run({ id: 'c', status: 'done', startedAt: 30_000, endedAt: 90_000 })
+    expect(totalsOf([first, second], 700_000).time).toBe(120_000)
+    expect(totalsOf([first, overlapping, second], 700_000).time).toBe(150_000)
+    expect(totalsOf([], 700_000).time).toBe(0)
   })
 
   test('fitText cuts to the width with an ellipsis', () => {

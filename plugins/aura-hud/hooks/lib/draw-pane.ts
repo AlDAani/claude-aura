@@ -12,6 +12,7 @@ import { S } from './strings'
 const TEXT_CSS = "text{font-family:-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',sans-serif;font-variant-numeric:tabular-nums}"
 
 export const ROW_H = 66
+export const DONE_H = 58
 export const OPEN_W = 26
 
 export const paneWidth = (bodyColumns: number): number => Math.max(240, Math.min(900, (bodyColumns || 40) * 8 - 8))
@@ -27,16 +28,16 @@ export const LIVE = '.live{animation:p 1.6s ease-in-out infinite}@keyframes p{50
 const SEP = '\u0001'
 const CACHE_LIMIT = 400
 const HEADER_INK: readonly InkClass[] = ['t', 's', 'tile']
-const ROW_INK: readonly InkClass[] = ['t', 's', 'm', 'k', 'ln', 'ok', 'no']
+const ROW_INK: readonly InkClass[] = ['t', 's', 'm', 'k', 'ln', 'ok', 'no', 'er']
 const PLANNED_INK: readonly InkClass[] = ['s', 'm', 'ln', 'id']
 const COMPACT_INK: readonly InkClass[] = ['s']
 
-export const TIER_MODEL: Readonly<Record<Tier, string>> = {
-  fable: 'Fable · high',
-  heavy: 'Opus · xhigh',
-  careful: 'Opus · high',
-  medium: 'Opus · medium',
-  light: 'Opus · low',
+export const TIER_EFFORT: Readonly<Record<Tier, string>> = {
+  fable: 'high',
+  heavy: 'xhigh',
+  careful: 'high',
+  medium: 'medium',
+  light: 'low',
   other: '',
 }
 
@@ -51,8 +52,10 @@ const remember = (key: string, value: string): string => {
 export const svg = (W: number, H: number, css: string, body: string): string =>
   `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}"><style>${TEXT_CSS}${css}</style>${body}</svg>`
 
+const liveClass = (tier: Tier): string => (tier === 'other' ? 's' : tierClass(tier))
+
 const statusMark = (x: number, y: number, status: AgentStatus | 'planned', tier: Tier): string => {
-  if (status === 'running') return `<circle class="live ${tierClass(tier)}" cx="${x}" cy="${y}" r="3.5"/>`
+  if (status === 'running') return `<circle class="live ${liveClass(tier)}" cx="${x}" cy="${y}" r="3.5"/>`
   if (status === 'done')
     return `<path class="ok" d="M${x - 5} ${y}l3.5 3.5 6.5-7" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>`
   if (status === 'failed')
@@ -106,45 +109,59 @@ export const headerSvg = (W: number, title: string, t: Totals, total: number | n
   return svg(W, headerHeight(W, title, total), paletteCss(paletteOf(lookId), HEADER_INK), head + tiles.map(tile).join(''))
 }
 
+export const rowHeightOf = (a: AgentRun): number => (a.status === 'running' ? ROW_H : DONE_H)
+
+const slide = (travel: number): string =>
+  `.sl{animation:sl${travel} 1.6s ease-in-out infinite alternate}@keyframes sl${travel}{to{transform:translateX(${travel}px)}}` +
+  '@media (prefers-reduced-motion: reduce){.sl{animation:none}}'
+
 export const agentSvg = (W: number, a: AgentRun, at: number, lookId: Look): string => {
   const tier = tierOf(a.type)
-  const ctx = ctxOf(a)
   const textW = W - 42 - 22
-  const meta = [a.effort ? `${modelName(a.model)} · ${a.effort}` : modelName(a.model)]
-  if (a.round > 1) meta.push(`${S.round} ${a.round}`)
-  if (a.status === 'failed') meta.push(S.failed)
-  const progress = progressOf(a)
-  const stats = `${S.ctx} ${ctx}% · ${fmtTokens(a.contextTokens)}  ≈${fmtCost(a.costUsd)}  ${fmtTime(elapsedOf(a, at))}`
+  const isRunning = a.status === 'running'
+  const H = rowHeightOf(a)
+  const meta = [modelName(a.model), a.effort ?? '', a.round > 1 ? `${S.round} ${a.round}` : ''].filter(Boolean)
+  const progress = isRunning ? progressOf(a) : null
+  const stats = `${S.ctx} ${ctxOf(a)}% · ≈${fmtCost(a.costUsd)} · ${fmtTime(elapsedOf(a, at))}`
   const steps = showsSteps(a) ? `${a.stepDone ?? 0}/${a.stepTotal}${a.stepNote ? ' · ' + a.stepNote : ''}` : ''
-  const fillW = Math.round(textW * (progress ?? ctx / 100))
-  const key = ['row', lookId, W, a.id, a.status, a.type, a.description, meta.join(' '), stats, steps, fillW, progress === null].join(SEP)
+  const fillW = progress === null ? 0 : Math.round(textW * progress)
+  const key = ['row', lookId, W, a.id, a.status, a.type, a.description, meta.join(' '), stats, steps, fillW].join(SEP)
   const hit = cache.get(key)
   if (hit !== undefined) return hit
 
   const tc = tierClass(tier)
+  const live = liveClass(tier)
   const costume = costumeOf(a.type)
-  const isRunning = a.status === 'running'
   const stepsW = Math.max(0, textW - textWidth(stats, 11) - 12)
-  const css = paletteCss(paletteOf(lookId), ROW_INK, [tier]) + (isRunning ? LIVE + crabCss([costume]) : '')
+  const segW = Math.max(24, Math.round(textW * 0.22))
+  const travel = Math.max(0, textW - segW)
+  const bar = !isRunning
+    ? ''
+    : `<rect class="k" x="42" y="55" width="${textW}" height="4" rx="2"/>` +
+      (progress === null
+        ? `<rect class="${live} sl" x="42" y="55" width="${segW}" height="4" rx="2"/>`
+        : `<rect class="${tc}" x="42" y="55" width="${fillW}" height="4" rx="2"/>`)
+  const css =
+    paletteCss(paletteOf(lookId), ROW_INK, [tier]) +
+    (isRunning ? LIVE + crabCss([costume]) + (progress === null ? slide(travel) : '') : '')
   const body =
-    crab(0, 14, costume, false, isRunning, CRAB_SCALE) +
+    crab(0, isRunning ? 14 : 10, costume, false, isRunning, CRAB_SCALE) +
     `<text class="t" x="42" y="18" font-size="13" font-weight="600">${xml(fitText(a.description || a.type, 13, textW))}</text>` +
     `<text x="42" y="34" font-size="11"><tspan class="${tc}">${xml(tier === 'other' ? a.type : tier)}</tspan>` +
-    `<tspan class="s">  ${xml(meta.join('  ·  '))}</tspan></text>` +
-    (steps && stepsW > 30
-      ? `<text class="t" x="42" y="49" font-size="11">${xml(fitText(steps, 11, stepsW))}</text>`
-      : '') +
+    `<tspan class="s"> · ${xml(meta.join(' · '))}</tspan>` +
+    (a.status === 'failed' ? `<tspan class="er"> · ${S.failed}</tspan>` : '') +
+    `</text>` +
+    (steps && stepsW > 30 ? `<text class="t" x="42" y="49" font-size="11">${xml(fitText(steps, 11, stepsW))}</text>` : '') +
     `<text class="s" x="${42 + textW}" y="49" text-anchor="end" font-size="11">${xml(stats)}</text>` +
-    `<rect class="k" x="42" y="55" width="${textW}" height="4" rx="2"/>` +
-    `<rect class="${progress === null ? 'm' : tc}" x="42" y="55" width="${fillW}" height="4" rx="2"/>` +
+    bar +
     statusMark(W - 8, 16, a.status, tier) +
-    `<line class="ln" x1="0" y1="65.5" x2="${W}" y2="65.5"/>`
-  return remember(key, svg(W, ROW_H, css, body))
+    `<line class="ln" x1="0" y1="${H - 0.5}" x2="${W}" y2="${H - 0.5}"/>`
+  return remember(key, svg(W, H, css, body))
 }
 
 export const plannedSvg = (W: number, pl: Planned, lookId: Look): string => {
   const textW = W - 42 - 22
-  const meta = [TIER_MODEL[pl.tier]]
+  const meta = [TIER_EFFORT[pl.tier] ? `${TIER_EFFORT[pl.tier]} ${S.effort}` : '']
   if (pl.after.length) meta.push(`${S.after} ${pl.after.join(', ')}`)
   const key = ['plan', lookId, W, pl.n, pl.title, pl.tier, meta.join(' ')].join(SEP)
   const hit = cache.get(key)
@@ -154,7 +171,7 @@ export const plannedSvg = (W: number, pl: Planned, lookId: Look): string => {
     crab(0, 6, pl.tier, true, false, CRAB_SCALE) +
     `<text class="s" x="42" y="18" font-size="13" font-weight="600">${xml(fitText(`${pl.n}. ${pl.title}`, 13, textW))}</text>` +
     `<text x="42" y="34" font-size="11"><tspan class="${tierClass(pl.tier)}">${xml(pl.tier)}</tspan>` +
-    `<tspan class="m">  ${xml(meta.filter(Boolean).join('  ·  '))}</tspan></text>` +
+    `<tspan class="m"> · ${xml(meta.filter(Boolean).join(' · '))}</tspan></text>` +
     statusMark(W - 8, 16, 'planned', pl.tier) +
     `<line class="ln" x1="0" y1="45.5" x2="${W}" y2="45.5"/>`
   return remember(key, svg(W, PLANNED_H, paletteCss(paletteOf(lookId), PLANNED_INK, [pl.tier]), body))
@@ -196,7 +213,7 @@ export const compactSvg = (
     .map(
       (ic, i) =>
         crab(i * 36, 0, ic.costume, ic.isDim, ic.isRunning, CRAB_SCALE) +
-        (ic.isRunning ? `<circle class="live ${tierClass(ic.tier)}" cx="${i * 36 + 32}" cy="4" r="3"/>` : ''),
+        (ic.isRunning ? `<circle class="live ${liveClass(ic.tier)}" cx="${i * 36 + 32}" cy="4" r="3"/>` : ''),
     )
     .join('')
   const x = shown.length * 36 + (more ? 4 : 0)

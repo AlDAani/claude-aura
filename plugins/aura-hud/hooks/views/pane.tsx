@@ -13,8 +13,8 @@ import {
   paneWidth,
   PLANNED_H,
   plannedSvg,
-  ROW_H,
-  TIER_MODEL,
+  rowHeightOf,
+  TIER_EFFORT,
 } from '../lib/draw-pane'
 import { fmtCost, fmtTime, fmtTokens, fmtUsd, textBar } from '../lib/format'
 import { modelName } from '../lib/model'
@@ -103,7 +103,7 @@ export const paneTree = (ui: Elements[RenderSurface], v: PaneView, act: PaneActi
     const W = paneWidth(v.bodyColumns)
     const runRow = (a: AgentRun) => (
       <Box key={a.id} flexDirection="row" alignItems="center">
-        <Svg source={agentSvg(W - OPEN_W, a, at, lookId)} alt={rowAlt(a, at)} width={W - OPEN_W} height={ROW_H} />
+        <Svg source={agentSvg(W - OPEN_W, a, at, lookId)} alt={rowAlt(a, at)} width={W - OPEN_W} height={rowHeightOf(a)} />
         {openButton(a)}
       </Box>
     )
@@ -174,7 +174,7 @@ export const paneTree = (ui: Elements[RenderSurface], v: PaneView, act: PaneActi
     const tier = tierOf(a.type)
     const color = tierHex(palette, tier)
     const ctx = ctxOf(a)
-    const progress = progressOf(a)
+    const progress = a.status === 'running' ? progressOf(a) : null
     const steps = showsSteps(a) ? `${a.stepDone ?? 0}/${a.stepTotal}${a.stepNote ? ' ' + a.stepNote : ''} · ` : ''
     return (
       <Box key={a.id} flexDirection="column" marginBottom={1}>
@@ -190,14 +190,14 @@ export const paneTree = (ui: Elements[RenderSurface], v: PaneView, act: PaneActi
           {'  '}
           {tier === 'other' ? a.type : tier} · {modelLine(a)}
           {a.round > 1 ? ` · ${S.round} ${a.round}` : ''}
+          {a.status === 'failed' ? <Text color="error"> · {S.failed}</Text> : null}
         </Text>
         <Text wrap="truncate-end">
           {'  '}
-          {progress === null ? <Text dimColor>{textBar(ctx / 100, barW)}</Text> : <Text color={color}>{textBar(progress, barW)}</Text>}
+          {progress === null ? null : <Text color={color}>{textBar(progress, barW)} </Text>}
           <Text dimColor>
-            {' '}
             {steps}
-            {S.ctx} {ctx}% · {fmtTokens(a.contextTokens)} ≈{fmtCost(a.costUsd)} {fmtTime(elapsedOf(a, at))}
+            {S.ctx} {ctx}% · ≈{fmtCost(a.costUsd)} · {fmtTime(elapsedOf(a, at))}
           </Text>
         </Text>
       </Box>
@@ -253,7 +253,8 @@ export const paneTree = (ui: Elements[RenderSurface], v: PaneView, act: PaneActi
               </Text>
               <Text dimColor wrap="truncate-end">
                 {'  '}
-                {pl.tier} · {TIER_MODEL[pl.tier]}
+                {pl.tier}
+                {TIER_EFFORT[pl.tier] ? ` · ${TIER_EFFORT[pl.tier]} ${S.effort}` : ''}
                 {pl.after.length ? ` · ${S.after} ${pl.after.join(', ')}` : ''}
               </Text>
             </Box>
