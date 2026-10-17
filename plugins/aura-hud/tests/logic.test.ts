@@ -4,7 +4,7 @@ import type { SessionMessage } from 'claude-code'
 
 import type { AgentRun } from '../types'
 
-import { agentSvg, compactSvg, DONE_H, headerHeight, headerSvg, plannedSvg, ROW_H, rowHeightOf } from '../hooks/lib/draw-pane'
+import { agentSvg, compactSvg, DONE_H, headerHeight, headerSvg, plannedSvg, ROW_H, rowCrabSvg, rowDetailsSvg, rowHeightOf } from '../hooks/lib/draw-pane'
 import { blank, label, merge, readProgress, readStep } from '../hooks/lib/flow'
 import { fitText, textWidth } from '../hooks/lib/format'
 import { toolsHeight, toolsSvg } from '../hooks/lib/draw-history'
@@ -175,10 +175,10 @@ describe('drawing', () => {
   test('the compact strip carries the session total and leaves room for it', () => {
     const totals = { cost: 1, tokens: 1_000, time: 60_000 }
     const runs = Array.from({ length: 30 }, (_, i) => run({ id: `r${i}`, status: 'done', endedAt: 5_000 }))
-    const strip = compactSvg(600, runs, [], totals, 250.47, 'claude')
+    const strip = compactSvg(600, runs, [], totals, 250.47, 'claude', 9_000)
     expect(strip).toContain('session $250.47')
     const crabs = (svg: string): number => (svg.match(/transform="translate\(/g) ?? []).length
-    expect(crabs(strip)).toBeLessThan(crabs(compactSvg(600, runs, [], totals, null, 'claude')))
+    expect(crabs(strip)).toBeLessThan(crabs(compactSvg(600, runs, [], totals, null, 'claude', 9_000)))
   })
 
   test('a bar shows real progress only', () => {
@@ -196,6 +196,19 @@ describe('drawing', () => {
       expect(rowHeightOf(run({ status }))).toBe(DONE_H)
     }
     expect(rowHeightOf(run({}))).toBe(ROW_H)
+  })
+
+  test('motion follows the clock, so a redraw every second never restarts it', () => {
+    const working = run({ type: 'general-purpose' })
+    const first = rowDetailsSvg(500, working, 10_000, 'claude')
+    const later = rowDetailsSvg(500, working, 11_000, 'claude')
+    expect(first).toContain('animation-delay:-0.400s')
+    expect(later).toContain('animation-delay:-1.400s')
+    expect(first).toContain('.sl{animation:sl 2.4s')
+    expect(first).toMatch(/@keyframes sl\{from\{transform:translateX\(-\d+px\)\}to\{transform:translateX\(478px\)\}\}/)
+    expect(first).toContain('clip-path="url(#tk)"')
+    expect(rowCrabSvg(working, 'claude')).toBe(rowCrabSvg({ ...working, costUsd: 9, steps: 99 }, 'claude'))
+    expect(rowCrabSvg(working, 'claude')).toContain('.run .la{animation')
   })
 
   test('a running agent of any type shows a live dot, a failed one says so in red', () => {

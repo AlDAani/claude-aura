@@ -189,6 +189,8 @@ test('a row opens the agent history, and back returns to the list', async ($, on
   await $.agent.spawn({ ...SPAWN, description: 'Fix login', subagentType: 'aura-flow:aura-medium', tool_use_id: 't1' })
   for (const surface of SURFACES) {
     const ui = await $.ui.mount({ plugin: PLUGIN, surface, component: 'Pane', requestId: PANE, props: PANE_PROPS })
+    const title = await ui.find({ key: 'open-a1' })
+    expect(JSON.stringify(title)).toContain('Fix login')
     await ui.press({ key: 'open-a1' })
     await clock.advance(100)
     const opened = JSON.stringify(await ui.drawn())

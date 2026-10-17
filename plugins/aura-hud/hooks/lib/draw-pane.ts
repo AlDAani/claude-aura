@@ -12,8 +12,13 @@ import { S } from './strings'
 const TEXT_CSS = "text{font-family:-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',sans-serif;font-variant-numeric:tabular-nums}"
 
 export const ROW_H = 66
-export const DONE_H = 58
-export const OPEN_W = 26
+export const DONE_H = 56
+export const CRAB_W = 42
+const BODY_RUN_H = 44
+const BODY_DONE_H = 34
+const CRAB_SPRITE_H = 29
+const SWEEP_MS = 2400
+const PULSE_MS = 1600
 
 export const paneWidth = (bodyColumns: number): number => Math.max(240, Math.min(900, (bodyColumns || 40) * 8 - 8))
 export const PLANNED_H = 46
@@ -111,52 +116,98 @@ export const headerSvg = (W: number, title: string, t: Totals, total: number | n
 
 export const rowHeightOf = (a: AgentRun): number => (a.status === 'running' ? ROW_H : DONE_H)
 
-const slide = (travel: number): string =>
-  `.sl{animation:sl${travel} 1.6s ease-in-out infinite alternate}@keyframes sl${travel}{to{transform:translateX(${travel}px)}}` +
+export const bodyHeightOf = (a: AgentRun): number => (a.status === 'running' ? BODY_RUN_H : BODY_DONE_H)
+
+const phaseOf = (at: number, periodMs: number): string => ((at % periodMs) / 1000).toFixed(3)
+
+const liveCss = (at: number): string =>
+  `.live{animation:p ${PULSE_MS / 1000}s ease-in-out infinite;animation-delay:-${phaseOf(at, PULSE_MS)}s}@keyframes p{50%{opacity:.3}}` +
+  '@media (prefers-reduced-motion: reduce){.live{animation:none}}'
+
+const sweepCss = (from: number, to: number, at: number): string =>
+  `.sl{animation:sl ${SWEEP_MS / 1000}s cubic-bezier(.45,0,.55,1) infinite;animation-delay:-${phaseOf(at, SWEEP_MS)}s}` +
+  `@keyframes sl{from{transform:translateX(${from}px)}to{transform:translateX(${to}px)}}` +
   '@media (prefers-reduced-motion: reduce){.sl{animation:none}}'
 
-export const agentSvg = (W: number, a: AgentRun, at: number, lookId: Look): string => {
-  const tier = tierOf(a.type)
-  const textW = W - 42 - 22
+const costumeTier = (costume: Costume): Tier => (costume === 'explore' ? 'other' : costume)
+
+type Part = { svg: string; css: string }
+
+const detailsOf = (x0: number, y0: number, textW: number, a: AgentRun, at: number, tier: Tier): Part => {
+  const tc = tierClass(tier)
   const isRunning = a.status === 'running'
-  const H = rowHeightOf(a)
   const meta = [modelName(a.model), a.effort ?? '', a.round > 1 ? `${S.round} ${a.round}` : ''].filter(Boolean)
   const progress = isRunning ? progressOf(a) : null
   const stats = `${S.ctx} ${ctxOf(a)}% · ≈${fmtCost(a.costUsd)} · ${fmtTime(elapsedOf(a, at))}`
   const steps = showsSteps(a) ? `${a.stepDone ?? 0}/${a.stepTotal}${a.stepNote ? ' · ' + a.stepNote : ''}` : ''
-  const fillW = progress === null ? 0 : Math.round(textW * progress)
-  const key = ['row', lookId, W, a.id, a.status, a.type, a.description, meta.join(' '), stats, steps, fillW].join(SEP)
-  const hit = cache.get(key)
-  if (hit !== undefined) return hit
-
-  const tc = tierClass(tier)
-  const live = liveClass(tier)
-  const costume = costumeOf(a.type)
   const stepsW = Math.max(0, textW - textWidth(stats, 11) - 12)
-  const segW = Math.max(24, Math.round(textW * 0.22))
-  const travel = Math.max(0, textW - segW)
+  const barY = y0 + 33
+  const segW = Math.max(28, Math.round(textW * 0.24))
+  const track = `<rect class="k" x="${x0}" y="${barY}" width="${textW}" height="4" rx="2"/>`
   const bar = !isRunning
     ? ''
-    : `<rect class="k" x="42" y="55" width="${textW}" height="4" rx="2"/>` +
-      (progress === null
-        ? `<rect class="${live} sl" x="42" y="55" width="${segW}" height="4" rx="2"/>`
-        : `<rect class="${tc}" x="42" y="55" width="${fillW}" height="4" rx="2"/>`)
-  const css =
-    paletteCss(paletteOf(lookId), ROW_INK, [tier]) +
-    (isRunning ? LIVE + crabCss([costume]) + (progress === null ? slide(travel) : '') : '')
-  const body =
-    crab(0, isRunning ? 14 : 10, costume, false, isRunning, CRAB_SCALE) +
-    `<text class="t" x="42" y="18" font-size="13" font-weight="600">${xml(fitText(a.description || a.type, 13, textW))}</text>` +
-    `<text x="42" y="34" font-size="11"><tspan class="${tc}">${xml(tier === 'other' ? a.type : tier)}</tspan>` +
+    : progress === null
+      ? track +
+        `<clipPath id="tk"><rect x="${x0}" y="${barY}" width="${textW}" height="4" rx="2"/></clipPath>` +
+        `<g clip-path="url(#tk)"><rect class="${liveClass(tier)} sl" x="${x0}" y="${barY}" width="${segW}" height="4" rx="2"/></g>`
+      : track + `<rect class="${tc}" x="${x0}" y="${barY}" width="${Math.round(textW * progress)}" height="4" rx="2"/>`
+  const svgText =
+    `<text x="${x0}" y="${y0 + 12}" font-size="11"><tspan class="${tc}">${xml(tier === 'other' ? a.type : tier)}</tspan>` +
     `<tspan class="s"> · ${xml(meta.join(' · '))}</tspan>` +
     (a.status === 'failed' ? `<tspan class="er"> · ${S.failed}</tspan>` : '') +
     `</text>` +
-    (steps && stepsW > 30 ? `<text class="t" x="42" y="49" font-size="11">${xml(fitText(steps, 11, stepsW))}</text>` : '') +
-    `<text class="s" x="${42 + textW}" y="49" text-anchor="end" font-size="11">${xml(stats)}</text>` +
-    bar +
+    (steps && stepsW > 30 ? `<text class="t" x="${x0}" y="${y0 + 27}" font-size="11">${xml(fitText(steps, 11, stepsW))}</text>` : '') +
+    `<text class="s" x="${x0 + textW}" y="${y0 + 27}" text-anchor="end" font-size="11">${xml(stats)}</text>` +
+    bar
+  const css = isRunning ? liveCss(at) + (progress === null ? sweepCss(-segW, textW, at) : '') : ''
+  return { svg: svgText, css }
+}
+
+const runKey = (kind: string, W: number, a: AgentRun, at: number, lookId: Look): string =>
+  [kind, lookId, W, a.id, a.status, a.type, a.description, a.model, a.effort, a.round, a.stepDone, a.stepTotal, a.stepNote]
+    .concat([ctxOf(a), fmtCost(a.costUsd), fmtTime(elapsedOf(a, at)), progressOf(a) ?? '', a.status === 'running' ? at : ''])
+    .join(SEP)
+
+export const agentSvg = (W: number, a: AgentRun, at: number, lookId: Look): string => {
+  const key = runKey('row', W, a, at, lookId)
+  const hit = cache.get(key)
+  if (hit !== undefined) return hit
+  const tier = tierOf(a.type)
+  const textW = W - CRAB_W - 22
+  const isRunning = a.status === 'running'
+  const H = rowHeightOf(a)
+  const costume = costumeOf(a.type)
+  const part = detailsOf(CRAB_W, 22, textW, a, at, tier)
+  const css = paletteCss(paletteOf(lookId), ROW_INK, [tier, costumeTier(costume)]) + (isRunning ? crabCss([costume]) : '') + part.css
+  const body =
+    crab(0, isRunning ? 14 : 10, costume, false, isRunning, CRAB_SCALE) +
+    `<text class="t" x="${CRAB_W}" y="18" font-size="13" font-weight="600">${xml(fitText(a.description || a.type, 13, textW))}</text>` +
+    part.svg +
     statusMark(W - 8, 16, a.status, tier) +
     `<line class="ln" x1="0" y1="${H - 0.5}" x2="${W}" y2="${H - 0.5}"/>`
   return remember(key, svg(W, H, css, body))
+}
+
+export const rowCrabSvg = (a: AgentRun, lookId: Look): string => {
+  const isRunning = a.status === 'running'
+  const costume = costumeOf(a.type)
+  const H = rowHeightOf(a)
+  const key = ['crab', lookId, costume, isRunning, H].join(SEP)
+  const hit = cache.get(key)
+  if (hit !== undefined) return hit
+  const css = paletteCss(paletteOf(lookId), [], [costumeTier(costume)]) + (isRunning ? crabCss([costume]) : '')
+  return remember(key, svg(CRAB_W, H, css, crab(0, Math.round((H - CRAB_SPRITE_H) / 2) - 2, costume, false, isRunning, CRAB_SCALE)))
+}
+
+export const rowDetailsSvg = (W: number, a: AgentRun, at: number, lookId: Look): string => {
+  const key = runKey('details', W, a, at, lookId)
+  const hit = cache.get(key)
+  if (hit !== undefined) return hit
+  const tier = tierOf(a.type)
+  const H = bodyHeightOf(a)
+  const part = detailsOf(0, 0, W - 22, a, at, tier)
+  const body = part.svg + statusMark(W - 8, 8, a.status, tier) + `<line class="ln" x1="0" y1="${H - 0.5}" x2="${W}" y2="${H - 0.5}"/>`
+  return remember(key, svg(W, H, paletteCss(paletteOf(lookId), ROW_INK, [tier]) + part.css, body))
 }
 
 export const plannedSvg = (W: number, pl: Planned, lookId: Look): string => {
@@ -186,6 +237,7 @@ export const compactSvg = (
   t: Totals,
   total: number | null,
   lookId: Look,
+  at: number,
 ): string => {
   const summary = totalsText(t, total)
   const runIcon = (a: AgentRun): Icon => ({
@@ -208,7 +260,7 @@ export const compactSvg = (
       paletteOf(lookId),
       COMPACT_INK,
       shown.map(ic => ic.tier),
-    ) + (walking.length ? LIVE + crabCss(walking.map(ic => ic.costume)) : '')
+    ) + (walking.length ? liveCss(at) + crabCss(walking.map(ic => ic.costume)) : '')
   const body = shown
     .map(
       (ic, i) =>

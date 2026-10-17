@@ -4,19 +4,21 @@ import type { AgentRun, AgentStatus, Flow, Look, Panel } from '../../types'
 
 import { MAX_FINISHED_ROWS } from '../lib/consts'
 import {
-  agentSvg,
+  bodyHeightOf,
   compactSvg,
   COMPACT_H,
+  CRAB_W,
   headerHeight,
   headerSvg,
-  OPEN_W,
   paneWidth,
   PLANNED_H,
   plannedSvg,
+  rowCrabSvg,
+  rowDetailsSvg,
   rowHeightOf,
   TIER_EFFORT,
 } from '../lib/draw-pane'
-import { fmtCost, fmtTime, fmtTokens, fmtUsd, textBar } from '../lib/format'
+import { fitText, fmtCost, fmtTime, fmtTokens, fmtUsd, textBar } from '../lib/format'
 import { modelName } from '../lib/model'
 import { paletteOf, tierHex } from '../lib/palette'
 import { ctxOf, elapsedOf, plannedOf, progressOf, showsSteps, tierOf, totalsOf } from '../lib/runs'
@@ -24,6 +26,7 @@ import { plural, S } from '../lib/strings'
 
 const STATUS_GLYPH: Readonly<Record<AgentStatus, string>> = { running: '●', done: '✓', failed: '✗' }
 const EXPAND_W = 64
+const TITLE_SIZE = 16
 
 type Head = 'empty' | 'run' | 'done' | 'plan'
 
@@ -90,8 +93,16 @@ export const paneTree = (ui: Elements[RenderSurface], v: PaneView, act: PaneActi
       onPress={act.toggleDone}
     />
   )
-  const openButton = (a: AgentRun) =>
-    a.agentId ? <Button key={`open-${a.id}`} label="›" plain dimColor onPress={() => act.openRun(a.id)} /> : null
+  const titleOf = (a: AgentRun, width: number) => {
+    const title = width > 0 ? fitText(a.description || a.type, TITLE_SIZE, width) : a.description || a.type
+    return a.agentId ? (
+      <Button key={`open-${a.id}`} plain hover={{ underline: true }} onPress={() => act.openRun(a.id)}>
+        <Text bold>{title}</Text>
+      </Button>
+    ) : (
+      <Text bold>{title}</Text>
+    )
+  }
   const earlier = hidden > 0 && !p.isDoneCollapsed && (
     <Text key="earlier" dimColor>
       +{hidden} {S.earlier}
@@ -101,10 +112,14 @@ export const paneTree = (ui: Elements[RenderSurface], v: PaneView, act: PaneActi
   if (v.surface === 'desktop' && 'Svg' in ui) {
     const { Svg } = ui
     const W = paneWidth(v.bodyColumns)
+    const bodyW = W - CRAB_W
     const runRow = (a: AgentRun) => (
-      <Box key={a.id} flexDirection="row" alignItems="center">
-        <Svg source={agentSvg(W - OPEN_W, a, at, lookId)} alt={rowAlt(a, at)} width={W - OPEN_W} height={rowHeightOf(a)} />
-        {openButton(a)}
+      <Box key={a.id} flexDirection="row">
+        <Svg source={rowCrabSvg(a, lookId)} alt={`${tierOf(a.type)} crab`} width={CRAB_W} height={rowHeightOf(a)} />
+        <Box flexDirection="column" flexGrow={1}>
+          {titleOf(a, bodyW - 8)}
+          <Svg source={rowDetailsSvg(bodyW, a, at, lookId)} alt={rowAlt(a, at)} width={bodyW} height={bodyHeightOf(a)} />
+        </Box>
       </Box>
     )
     const firstHead: Head = isEmpty ? 'empty' : running.length ? 'run' : finishedAll.length ? 'done' : 'plan'
@@ -130,7 +145,7 @@ export const paneTree = (ui: Elements[RenderSurface], v: PaneView, act: PaneActi
       return (
         <Box flexDirection="row" justifyContent="space-between" alignItems="center">
           <Svg
-            source={compactSvg(W - EXPAND_W, list, planned, t, v.total, lookId)}
+            source={compactSvg(W - EXPAND_W, list, planned, t, v.total, lookId, at)}
             alt={`${list.length} ${plural(list.length, 'agent', 'agents')}, ${summary}`}
             width={W - EXPAND_W}
             height={COMPACT_H}
@@ -180,11 +195,8 @@ export const paneTree = (ui: Elements[RenderSurface], v: PaneView, act: PaneActi
       <Box key={a.id} flexDirection="column" marginBottom={1}>
         <Box flexDirection="row" gap={1}>
           <Text color={color}>▣</Text>
-          <Text bold wrap="truncate-end">
-            {a.description || a.type}
-          </Text>
+          {titleOf(a, 0)}
           <Text color={a.status === 'failed' ? 'error' : a.status === 'done' ? 'success' : color}>{STATUS_GLYPH[a.status]}</Text>
-          {openButton(a)}
         </Box>
         <Text dimColor wrap="truncate-end">
           {'  '}
