@@ -29,7 +29,6 @@ export type AgentRun = {
   type: string
   description: string
   model: string
-  /** The costume is chosen when the agent starts, so redraws never reroll it. */
   costume?: string
   effort?: string
   status: AgentStatus
@@ -69,6 +68,7 @@ declare module 'claude-code' {
       now: number
       look: Look
       total: number | null
+      context: number | null
     }
   }
 }

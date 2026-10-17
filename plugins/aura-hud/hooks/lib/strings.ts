@@ -4,6 +4,8 @@ export const S = {
   tokens: 'Tokens',
   time: 'Time',
   session: 'Session cost',
+  context: 'Main context',
+  contextWord: 'main ctx',
   effort: 'effort',
   sessionWord: 'session',
   collapse: 'Collapse',

@@ -17,7 +17,6 @@ export const CRAB_W = 42
 const BODY_RUN_H = 44
 const BODY_DONE_H = 34
 const CRAB_SPRITE_H = 29
-const SWEEP_MS = 2400
 const PULSE_MS = 1600
 
 export const paneWidth = (bodyColumns: number): number => Math.max(240, Math.min(900, (bodyColumns || 40) * 8 - 8))
@@ -28,11 +27,12 @@ const CRAB_SCALE = 1.1
 const VALUE_SIZE = 15
 const TILE_H = 40
 const TILE_GAP = 6
-const TWO_ROWS_BELOW = 360
+const MIN_TILE = 86
+const HOT_CONTEXT = 80
 export const LIVE = '.live{animation:p 1.6s ease-in-out infinite}@keyframes p{50%{opacity:.3}}@media (prefers-reduced-motion: reduce){.live{animation:none}}'
 const SEP = '\u0001'
 const CACHE_LIMIT = 400
-const HEADER_INK: readonly InkClass[] = ['t', 's', 'tile']
+const HEADER_INK: readonly InkClass[] = ['t', 's', 'tile', 'er']
 const ROW_INK: readonly InkClass[] = ['t', 's', 'm', 'k', 'ln', 'ok', 'no', 'er']
 const PLANNED_INK: readonly InkClass[] = ['s', 'm', 'ln', 'id']
 const COMPACT_INK: readonly InkClass[] = ['s']
@@ -71,31 +71,37 @@ const statusMark = (x: number, y: number, status: AgentStatus | 'planned', tier:
   )
 }
 
-const tilesOf = (t: Totals, total: number | null): (readonly [string, string])[] => {
+const tilesOf = (t: Totals, total: number | null, context: number | null): (readonly [string, string])[] => {
   const tiles: (readonly [string, string])[] = [
     [S.cost, '≈' + fmtCost(t.cost)],
     [S.tokens, fmtTokens(t.tokens)],
     [S.time, fmtTime(t.time)],
   ]
   if (total !== null) tiles.push([S.session, fmtUsd(total)])
+  if (context !== null) tiles.push([S.context, `${context}%`])
   return tiles
 }
 
-const columnsOf = (W: number, count: number): number => (count > 3 && W < TWO_ROWS_BELOW ? 2 : count)
+const columnsOf = (W: number, count: number): number => {
+  const fits = Math.max(1, Math.floor((W + TILE_GAP) / (MIN_TILE + TILE_GAP)))
+  return count <= fits ? count : Math.max(2, Math.min(fits, Math.ceil(count / 2)))
+}
 
-export const headerHeight = (W: number, title: string, total: number | null): number => {
-  const count = total === null ? 3 : 4
+export const headerHeight = (W: number, title: string, total: number | null, context: number | null): number => {
+  const count = 3 + (total === null ? 0 : 1) + (context === null ? 0 : 1)
   return (title ? 28 : 0) + Math.ceil(count / columnsOf(W, count)) * (TILE_H + TILE_GAP) - 2
 }
 
 const valueSize = (value: string, maxW: number): number =>
   Math.floor(Math.max(10, Math.min(VALUE_SIZE, (VALUE_SIZE * maxW) / Math.max(1, textWidth(value, VALUE_SIZE)))) * 2) / 2
 
-export const totalsText = (t: Totals, total: number | null): string =>
-  `≈${fmtCost(t.cost)} · ${fmtTokens(t.tokens)} · ${fmtTime(t.time)}` + (total === null ? '' : ` · ${S.sessionWord} ${fmtUsd(total)}`)
+export const totalsText = (t: Totals, total: number | null, context: number | null): string =>
+  `≈${fmtCost(t.cost)} · ${fmtTokens(t.tokens)} · ${fmtTime(t.time)}` +
+  (total === null ? '' : ` · ${S.sessionWord} ${fmtUsd(total)}`) +
+  (context === null ? '' : ` · ${S.contextWord} ${context}%`)
 
-export const headerSvg = (W: number, title: string, t: Totals, total: number | null, lookId: Look): string => {
-  const tiles = tilesOf(t, total)
+export const headerSvg = (W: number, title: string, t: Totals, total: number | null, context: number | null, lookId: Look): string => {
+  const tiles = tilesOf(t, total, context)
   const cols = columnsOf(W, tiles.length)
   const tw = (W - TILE_GAP * (cols - 1)) / cols
   const top = title ? 28 : 0
@@ -105,29 +111,26 @@ export const headerSvg = (W: number, title: string, t: Totals, total: number | n
     return (
       `<rect class="tile" x="${x}" y="${y}" width="${tw}" height="${TILE_H}" rx="8"/>` +
       `<text class="s" x="${x + 9}" y="${y + 16}" font-size="11">${xml(fitText(name, 11, tw - 18))}</text>` +
-      `<text class="t" x="${x + 9}" y="${y + 33}" font-size="${valueSize(value, tw - 18)}" font-weight="600">${xml(value)}</text>`
+      `<text class="${name === S.context && context !== null && context >= HOT_CONTEXT ? 'er' : 't'}" x="${x + 9}" y="${y + 33}" font-size="${valueSize(value, tw - 18)}" font-weight="600">${xml(value)}</text>`
     )
   }
   const head = title
     ? `<text class="t" x="0" y="15" font-size="14" font-weight="600">${xml(fitText(title, 14, W))}</text>`
     : ''
-  return svg(W, headerHeight(W, title, total), paletteCss(paletteOf(lookId), HEADER_INK), head + tiles.map(tile).join(''))
+  return svg(W, headerHeight(W, title, total, context), paletteCss(paletteOf(lookId), HEADER_INK), head + tiles.map(tile).join(''))
 }
 
-export const rowHeightOf = (a: AgentRun): number => (a.status === 'running' ? ROW_H : DONE_H)
+const hasBar = (a: AgentRun): boolean => a.status === 'running' && progressOf(a) !== null
 
-export const bodyHeightOf = (a: AgentRun): number => (a.status === 'running' ? BODY_RUN_H : BODY_DONE_H)
+export const rowHeightOf = (a: AgentRun): number => (hasBar(a) ? ROW_H : DONE_H)
+
+export const bodyHeightOf = (a: AgentRun): number => (hasBar(a) ? BODY_RUN_H : BODY_DONE_H)
 
 const phaseOf = (at: number, periodMs: number): string => ((at % periodMs) / 1000).toFixed(3)
 
 const liveCss = (at: number): string =>
   `.live{animation:p ${PULSE_MS / 1000}s ease-in-out infinite;animation-delay:-${phaseOf(at, PULSE_MS)}s}@keyframes p{50%{opacity:.3}}` +
   '@media (prefers-reduced-motion: reduce){.live{animation:none}}'
-
-const sweepCss = (from: number, to: number, at: number): string =>
-  `.sl{animation:sl ${SWEEP_MS / 1000}s cubic-bezier(.45,0,.55,1) infinite;animation-delay:-${phaseOf(at, SWEEP_MS)}s}` +
-  `@keyframes sl{from{transform:translateX(${from}px)}to{transform:translateX(${to}px)}}` +
-  '@media (prefers-reduced-motion: reduce){.sl{animation:none}}'
 
 type Part = { svg: string; css: string }
 
@@ -140,15 +143,11 @@ const detailsOf = (x0: number, y0: number, textW: number, a: AgentRun, at: numbe
   const steps = showsSteps(a) ? `${a.stepDone ?? 0}/${a.stepTotal}${a.stepNote ? ' · ' + a.stepNote : ''}` : ''
   const stepsW = Math.max(0, textW - textWidth(stats, 11) - 12)
   const barY = y0 + 33
-  const segW = Math.max(28, Math.round(textW * 0.24))
-  const track = `<rect class="k" x="${x0}" y="${barY}" width="${textW}" height="4" rx="2"/>`
-  const bar = !isRunning
-    ? ''
-    : progress === null
-      ? track +
-        `<clipPath id="tk"><rect x="${x0}" y="${barY}" width="${textW}" height="4" rx="2"/></clipPath>` +
-        `<g clip-path="url(#tk)"><rect class="${liveClass(tier)} sl" x="${x0}" y="${barY}" width="${segW}" height="4" rx="2"/></g>`
-      : track + `<rect class="${tc}" x="${x0}" y="${barY}" width="${Math.round(textW * progress)}" height="4" rx="2"/>`
+  const bar =
+    progress === null
+      ? ''
+      : `<rect class="k" x="${x0}" y="${barY}" width="${textW}" height="4" rx="2"/>` +
+        `<rect class="${tc}" x="${x0}" y="${barY}" width="${Math.round(textW * progress)}" height="4" rx="2"/>`
   const svgText =
     `<text x="${x0}" y="${y0 + 12}" font-size="11"><tspan class="${tc}">${xml(tier === 'other' ? a.type : tier)}</tspan>` +
     `<tspan class="s"> · ${xml(meta.join(' · '))}</tspan>` +
@@ -157,7 +156,7 @@ const detailsOf = (x0: number, y0: number, textW: number, a: AgentRun, at: numbe
     (steps && stepsW > 30 ? `<text class="t" x="${x0}" y="${y0 + 27}" font-size="11">${xml(fitText(steps, 11, stepsW))}</text>` : '') +
     `<text class="s" x="${x0 + textW}" y="${y0 + 27}" text-anchor="end" font-size="11">${xml(stats)}</text>` +
     bar
-  const css = isRunning ? liveCss(at) + (progress === null ? sweepCss(-segW, textW, at) : '') : ''
+  const css = isRunning ? liveCss(at) : ''
   return { svg: svgText, css }
 }
 
@@ -234,10 +233,11 @@ export const compactSvg = (
   planned: readonly Planned[],
   t: Totals,
   total: number | null,
+  context: number | null,
   lookId: Look,
   at: number,
 ): string => {
-  const summary = totalsText(t, total)
+  const summary = totalsText(t, total, context)
   const runIcon = (a: AgentRun): Icon => ({
     costume: costumeOf(a.type, a.model, a.id, a.costume),
     tier: tierOf(a.type),

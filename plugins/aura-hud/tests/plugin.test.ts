@@ -166,6 +166,10 @@ test('the panel shows the whole session total and follows it', async ($, on) => 
   for (const surface of SURFACES) expect(await drawn(surface)).toContain('$250.47')
   await $.session.measure({ context: { window: 1_000_000 }, rateLimits: [], cost: { usd: 251.1 }, changed: ['cost'] })
   for (const surface of SURFACES) expect(await drawn(surface)).toContain('$251.10')
+  await $.session.measure({ context: { window: 1_000_000, tokens: 412_000, percent: 41 }, rateLimits: [], cost: { usd: 251.1 }, changed: ['context'] })
+  expect(await drawn('desktop')).toContain('Main context')
+  expect(await drawn('desktop')).toContain('41%')
+  expect(await drawn('terminal')).toContain('main ctx 41%')
 })
 
 test('a row opens the agent history, and back returns to the list', async ($, on) => {

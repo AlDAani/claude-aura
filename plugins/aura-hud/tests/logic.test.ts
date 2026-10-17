@@ -161,7 +161,7 @@ describe('drawing', () => {
       let accents = 0
       for (const [color, runs] of art) {
         for (const run of runs.split(' ')) {
-          const [x, y, width] = run.split(',').map(Number)
+          const [x = 0, y = 0, width = 0] = run.split(',').map(Number)
           expect(x).toBeGreaterThanOrEqual(0)
           expect(x + width).toBeLessThanOrEqual(31)
           expect(y).toBeGreaterThanOrEqual(0)
@@ -179,18 +179,31 @@ describe('drawing', () => {
 
   test('the header adds a session tile once the session total is known', () => {
     const totals = { cost: 5.16, tokens: 14_500_000, time: 2_503_000 }
-    const withTotal = headerSvg(600, 'Aura flow', totals, 250.47, 'claude')
+    const withTotal = headerSvg(600, 'Aura flow', totals, 250.47, null, 'claude')
     expect(withTotal).toContain('>Session cost<')
     expect(withTotal).toContain('>Agent cost<')
     expect(withTotal).toContain('>$250.47<')
     expect(withTotal).toContain('≈$5.16')
-    expect(headerSvg(600, 'Aura flow', totals, null, 'claude')).not.toContain('Session')
+    expect(headerSvg(600, 'Aura flow', totals, null, null, 'claude')).not.toContain('Session')
+  })
+
+  test('the header shows the main session context, in red once it runs high', () => {
+    const totals = { cost: 5.16, tokens: 14_500_000, time: 2_503_000 }
+    const calm = headerSvg(472, '', totals, 18.5, 34, 'claude')
+    expect(calm).toContain('>Main context<')
+    expect(calm).toContain('class="t" x="')
+    expect(calm).toMatch(/class="t" x="[\d.]+" y="[\d.]+" font-size="[\d.]+" font-weight="600">34%</)
+    expect((calm.match(/class="tile"/g) ?? []).length).toBe(5)
+    expect(new Set([...calm.matchAll(/class="tile" x="[\d.]+" y="([\d.]+)"/g)].map(m => m[1])).size).toBe(1)
+    const hot = headerSvg(472, '', totals, 18.5, 91, 'claude')
+    expect(hot).toMatch(/class="er" x="[\d.]+" y="[\d.]+" font-size="[\d.]+" font-weight="600">91%</)
+    expect(new Set([...headerSvg(400, '', totals, 18.5, 34, 'claude').matchAll(/class="tile" x="[\d.]+" y="([\d.]+)"/g)].map(m => m[1])).size).toBe(2)
   })
 
   test('a narrow header wraps its tiles instead of squeezing the numbers', () => {
     const totals = { cost: 5.16, tokens: 14_500_000, time: 2_503_000 }
     for (const W of [240, 359, 360, 600]) {
-      const svg = headerSvg(W, 'Aura flow', totals, 12_345.67, 'claude')
+      const svg = headerSvg(W, 'Aura flow', totals, 12_345.67, null, 'claude')
       const widths = [...svg.matchAll(/class="tile" x="[\d.]+" y="[\d.]+" width="([\d.]+)"/g)].map(m => Number(m[1]))
       const values = [...svg.matchAll(/font-size="([\d.]+)" font-weight="600">([^<]+)</g)].slice(1)
       expect(widths.length).toBe(4)
@@ -199,36 +212,36 @@ describe('drawing', () => {
         expect(Number(size)).toBeGreaterThanOrEqual(12)
         expect(textWidth(value ?? '', Number(size))).toBeLessThanOrEqual((widths[i] ?? 0) - 18 + 0.01)
       })
-      expect(svg).toContain(`height="${headerHeight(W, 'Aura flow', 12_345.67)}"`)
+      expect(svg).toContain(`height="${headerHeight(W, 'Aura flow', 12_345.67, null)}"`)
     }
-    expect(headerHeight(240, 'Aura flow', 1)).toBeGreaterThan(headerHeight(600, 'Aura flow', 1))
-    expect(headerHeight(600, 'Aura flow', null)).toBe(72)
+    expect(headerHeight(240, 'Aura flow', 1, null)).toBeGreaterThan(headerHeight(600, 'Aura flow', 1, null))
+    expect(headerHeight(600, 'Aura flow', null, null)).toBe(72)
   })
 
   test('the compact strip carries the session total and leaves room for it', () => {
     const totals = { cost: 1, tokens: 1_000, time: 60_000 }
     const runs = Array.from({ length: 30 }, (_, i) => run({ id: `r${i}`, status: 'done', endedAt: 5_000 }))
-    const strip = compactSvg(600, runs, [], totals, 250.47, 'claude', 9_000)
-    expect(strip).toContain('session $250.47')
+    const strip = compactSvg(600, runs, [], totals, 250.47, 34, 'claude', 9_000)
+    expect(strip).toContain('session $250.47 · main ctx 34%')
     const crabs = (svg: string): number => (svg.match(/transform="translate\(/g) ?? []).length
-    expect(crabs(strip)).toBeLessThan(crabs(compactSvg(600, runs, [], totals, null, 'claude', 9_000)))
+    expect(crabs(strip)).toBeLessThan(crabs(compactSvg(600, runs, [], totals, null, null, 'claude', 9_000)))
   })
 
   test('a bar shows real progress only', () => {
     const stepped = agentSvg(600, run({ stepDone: 2, stepTotal: 5 }), 9_000, 'claude')
     expect(stepped).toContain('class="tc" x="42" y="55" width="')
-    expect(stepped).not.toContain(' sl"')
+    expect(rowHeightOf(run({ stepDone: 2, stepTotal: 5 }))).toBe(ROW_H)
     const working = agentSvg(600, run({ type: 'general-purpose' }), 9_000, 'claude')
-    expect(working).toContain('class="s sl"')
-    expect(working).toContain('@keyframes sl')
-    expect(working).toContain('prefers-reduced-motion')
+    expect(working).not.toContain('class="k"')
+    expect(working).not.toContain('@keyframes sl')
+    expect(working).toContain(`height="${DONE_H}"`)
     for (const status of ['done', 'failed'] as const) {
       const over = agentSvg(600, run({ status, endedAt: 5_000, stepDone: 4, stepTotal: 6 }), 9_000, 'claude')
       expect(over).not.toContain('class="k"')
       expect(over).toContain(`height="${DONE_H}"`)
       expect(rowHeightOf(run({ status }))).toBe(DONE_H)
     }
-    expect(rowHeightOf(run({}))).toBe(ROW_H)
+    expect(rowHeightOf(run({}))).toBe(DONE_H)
   })
 
   test('motion follows the clock, so a redraw every second never restarts it', () => {
@@ -237,11 +250,19 @@ describe('drawing', () => {
     const later = rowDetailsSvg(500, working, 11_000, 'claude')
     expect(first).toContain('animation-delay:-0.400s')
     expect(later).toContain('animation-delay:-1.400s')
-    expect(first).toContain('.sl{animation:sl 2.4s')
-    expect(first).toMatch(/@keyframes sl\{from\{transform:translateX\(-\d+px\)\}to\{transform:translateX\(478px\)\}\}/)
-    expect(first).toContain('clip-path="url(#tk)"')
     expect(rowCrabSvg(working, 'claude')).toBe(rowCrabSvg({ ...working, costUsd: 9, steps: 99 }, 'claude'))
     expect(rowCrabSvg(working, 'claude')).toContain('.run .la{animation')
+  })
+
+  test('a working agent hops, a finished one stands still', () => {
+    const working = rowCrabSvg(run({ type: 'general-purpose', model: 'claude-sonnet-5-5', costume: 'sonnet-poet' }), 'claude')
+    expect(working).toContain('.run{animation:hop 1s')
+    expect(working).toContain('@keyframes hop')
+    expect(working).toContain('prefers-reduced-motion')
+    expect(working).toContain('class="c-sonnet-poet run"')
+    const resting = rowCrabSvg(run({ status: 'done', endedAt: 5_000, model: 'claude-sonnet-5-5', costume: 'sonnet-poet' }), 'claude')
+    expect(resting).not.toContain('@keyframes hop')
+    expect(resting).not.toContain(' run"')
   })
 
   test('a running agent of any type shows a live dot, a failed one says so in red', () => {

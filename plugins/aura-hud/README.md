@@ -6,9 +6,9 @@ A Claude Code mod: a live panel of subagents. Made for the [aura-flow](../aura-f
 /plugin install aura-hud --marketplace AlDAani/claude-aura
 ```
 
-- **Agents panel**: opens by itself when subagents start working, and once per batch: closed, it stays closed until the next batch. It shows the flow's title and plan, the cost and tokens of the agents it lists and the time they spent running, and the cost of the whole session (the main thread and every subagent, the figure `/cost` shows). It lists running, finished and planned subagents with model, effort, task progress, context, estimated cost and time. Clicking a subagent's title opens its history in the panel, scrolled to its latest entries: its brief, what it wrote, and a timeline of its tool calls, one line each, repeats folded and errors in red; a running one fills in as it works, and ← Agents goes back to the list. Working crabs walk, and each tier animates its prop: the astronaut floats, the detective sweeps the magnifier, the engineer turns the wrench, the chef tosses the omelette, the racer runs with a fluttering flag. `prefers-reduced-motion` stops them. The panel lists the 40 newest finished runs.
+- **Agents panel**: opens by itself when subagents start working, and once per batch: closed, it stays closed until the next batch. It shows the flow's title and plan, the cost and tokens of the agents it lists and the time they spent running, the cost of the whole session (the main thread and every subagent, the figure `/cost` shows), and how full the main session's context is, in red from 80%. It lists running, finished and planned subagents with model, effort, task progress, context, estimated cost and time. Clicking a subagent's title opens its history in the panel, scrolled to its latest entries: its brief, what it wrote, and a timeline of its tool calls, one line each, repeats folded and errors in red; a running one fills in as it works, and ← Agents goes back to the list. Working crabs hop and walk, and the original six costumes also animate their props: the astronaut floats, the detective sweeps the magnifier, the engineer turns the wrench, the chef tosses the omelette, the racer runs with a fluttering flag. `prefers-reduced-motion` stops them. The panel lists the 40 newest finished runs.
 
-Each Fable, Opus, Sonnet, and Haiku agent receives one of eight costumes when it starts and keeps that choice for its lifetime. Unknown models use the plain crab. The generated source art, normalized 32×32 exports, prompt metadata, and a light/dark contact sheet live in `assets/costumes/`. From this plugin folder, rerun `node tools/import-costumes.mjs` to rebuild from its bundled `assets/costumes/source/` PNGs; pass another input directory to import replacements.
+Each Fable, Opus, Sonnet and Haiku agent gets one of eight costumes when it starts and keeps it for its lifetime. Unknown models use the plain crab. The costumes ship as compact pixel runs in `hooks/lib/generated-costumes.ts`; the importer, the 32×32 sprites, the prompt set and a light/dark contact sheet live in `art/costumes/` at the root of the repository, outside the installed plugin. To rebuild from generated PNGs, run `node art/costumes/import-costumes.mjs <folder>` from the repository root.
 
 ## Palettes
 
@@ -26,7 +26,7 @@ Each palette has a light and a dark variant that follow the system appearance. S
 ## Tools it adds
 
 - `mcp__aura-hud__progress`: the orchestrator reports the plan, phase and accepted tasks.
-- `mcp__aura-hud__step`: a worker reports its own steps (`done`, `total`, `note`). A worker that does not report shows a sliding bar while it works; finished rows drop the bar.
+- `mcp__aura-hud__step`: a worker reports its own steps (`done`, `total`, `note`). Only a worker that reports steps gets a progress bar; any other running agent shows its live dot and its hopping crab.
 
 The agents' cost is an estimate from token counts and a built-in table of Anthropic prices (`hooks/lib/model.ts`), not a bill. The session tile is Claude Code's own running total, the same figure `/cost` shows.
 

@@ -184,9 +184,6 @@ for (const [name, legacy] of Object.entries(LEGACY_COSTUME_ART)) {
 
 for (const name of Object.keys(importedCostumes)) {
   COSTUMES.set(name as Costume, f => {
-    // The imported template crab is offset (+1,+6) from this renderer.  The
-    // importer has already translated safe-zone costume pixels by (-1,-6).
-    // Paint the costume first, then redraw the canonical animated crab.
     drawImported(f, name)
     crabBody(f)
   })
@@ -234,9 +231,9 @@ export const crab = (x: number, y: number, costume: Costume, isDim: boolean, isW
   `<g class="c-${costume}${isWalking ? ' run' : ''}">${innerOf(costume)}</g></g>`
 
 const WALK =
-  '.run .la{animation:st .5s steps(1) infinite}.run .lb{animation:st .5s steps(1) infinite -.25s}' +
-  '.run .bd{animation:bob .5s steps(1) infinite -.125s}.run g{transform-box:fill-box}' +
-  '@keyframes st{50%{transform:translateY(-1px)}}@keyframes bob{50%{transform:translateY(1px)}}'
+  '.run{animation:hop 1s cubic-bezier(.3,0,.3,1) infinite}' +
+  '.run .la{animation:st .5s steps(1) infinite}.run .lb{animation:st .5s steps(1) infinite -.25s}.run g{transform-box:fill-box}' +
+  '@keyframes hop{0%,45%,100%{transform:translateY(0)}20%{transform:translateY(-3px)}}@keyframes st{50%{transform:translateY(-1px)}}'
 
 const BLINK = '@keyframes blink{50%{opacity:.15}}'
 

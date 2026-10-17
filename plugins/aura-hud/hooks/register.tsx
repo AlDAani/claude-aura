@@ -26,6 +26,7 @@ const panel = atom({ plugin: 'aura-hud', key: 'panel' } as const, {
 const now = atom({ plugin: 'aura-hud', key: 'now' } as const, 0)
 const look = atom({ plugin: 'aura-hud', key: 'look' } as const, 'claude')
 const total = atom({ plugin: 'aura-hud', key: 'total' } as const, null)
+const mainContext = atom({ plugin: 'aura-hud', key: 'context' } as const, null)
 
 const TOOL = 'mcp__aura-hud__progress'
 const STEP_TOOL = 'mcp__aura-hud__step'
@@ -64,8 +65,16 @@ async function setTotal($: EngineInterface, usd: number | undefined): Promise<vo
   await update($, total, prev => (prev === next ? prev : next))
 }
 
+async function setContext($: EngineInterface, percent: number | undefined): Promise<void> {
+  if (typeof percent !== 'number' || !Number.isFinite(percent)) return
+  const next = Math.max(0, Math.min(100, Math.round(percent)))
+  await update($, mainContext, prev => (prev === next ? prev : next))
+}
+
 async function syncTotal($: EngineInterface): Promise<void> {
-  await setTotal($, (await $.session.usage()).cost?.usd)
+  const usage = await $.session.usage()
+  await setTotal($, usage.cost?.usd)
+  await setContext($, usage.context.percent)
 }
 
 async function historyFor($: EngineInterface, run: AgentRun, agentId: string): Promise<History | string> {
@@ -220,6 +229,7 @@ export const register: Register = on => {
   on('session.measure', async ($, e, next) => {
     const measured = await next(e)
     await quietly(() => setTotal($, e.cost?.usd))
+    await quietly(() => setContext($, e.context.percent))
     return measured
   })
 
@@ -337,6 +347,7 @@ export const register: Register = on => {
         panel: p,
         look: lookId,
         total: await read($, total),
+        context: await read($, mainContext),
         at,
         bodyColumns: e.props.bodyColumns,
       },

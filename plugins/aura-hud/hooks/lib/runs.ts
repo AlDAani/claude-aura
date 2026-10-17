@@ -44,8 +44,8 @@ const isCostume = (value: string): value is Costume =>
   value === 'explore' || (['fable', 'heavy', 'careful', 'medium', 'light', 'other'] as readonly string[]).includes(value) || ALL_MODEL_COSTUMES.has(value)
 
 const familyOf = (model: string): ModelFamily | null => {
-  const found = /(?:^|[-:])(fable|opus|sonnet|haiku)(?:[-:]|$)/i.exec(model)
-  return found ? (found[1].toLowerCase() as ModelFamily) : null
+  const name = /(?:^|[-:])(fable|opus|sonnet|haiku)(?:[-:]|$)/i.exec(model)?.[1]
+  return name ? (name.toLowerCase() as ModelFamily) : null
 }
 
 const legacyCostumeOf = (type: string): Costume => (type === 'Explore' ? 'explore' : tierOf(type))
@@ -63,7 +63,6 @@ export const newCostumeOf = (type: string, model: string, random = Math.random):
   return set[Math.min(set.length - 1, Math.floor(random() * set.length))] as Costume
 }
 
-/** Returns the stored choice, with a stable migration path for runs saved before costumes existed. */
 export const costumeOf = (type: string, model = '', id = '', stored?: string): Costume => {
   if (stored && isCostume(stored)) return stored
   const family = familyOf(model)

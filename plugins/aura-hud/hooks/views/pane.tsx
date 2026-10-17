@@ -50,6 +50,7 @@ export type PaneView = {
   panel: Panel
   look: Look
   total: number | null
+  context: number | null
   at: number
   bodyColumns: number
 }
@@ -70,7 +71,9 @@ export const paneTree = (ui: Elements[RenderSurface], v: PaneView, act: PaneActi
   const t = totalsOf(list, at)
   const title = f && !f.isFinished ? f.title : ''
   const isEmpty = list.length === 0 && planned.length === 0
-  const sessionText = v.total === null ? '' : `${S.sessionWord} ${fmtUsd(v.total)}`
+  const sessionText = [v.total === null ? '' : `${S.sessionWord} ${fmtUsd(v.total)}`, v.context === null ? '' : `${S.contextWord} ${v.context}%`]
+    .filter(Boolean)
+    .join(' · ')
   const summary = [`≈${fmtCost(t.cost)}`, `${fmtTokens(t.tokens)} ${plural(t.tokens, 'token', 'tokens')}`, fmtTime(t.time), sessionText]
     .filter(Boolean)
     .join(', ')
@@ -145,7 +148,7 @@ export const paneTree = (ui: Elements[RenderSurface], v: PaneView, act: PaneActi
       return (
         <Box flexDirection="row" justifyContent="space-between" alignItems="center">
           <Svg
-            source={compactSvg(W - EXPAND_W, list, planned, t, v.total, lookId, at)}
+            source={compactSvg(W - EXPAND_W, list, planned, t, v.total, v.context, lookId, at)}
             alt={`${list.length} ${plural(list.length, 'agent', 'agents')}, ${summary}`}
             width={W - EXPAND_W}
             height={COMPACT_H}
@@ -157,10 +160,10 @@ export const paneTree = (ui: Elements[RenderSurface], v: PaneView, act: PaneActi
     return (
       <Box flexDirection="column">
         <Svg
-          source={headerSvg(W, title, t, v.total, lookId)}
+          source={headerSvg(W, title, t, v.total, v.context, lookId)}
           alt={title ? `${title}: ${summary}` : summary}
           width={W}
-          height={headerHeight(W, title, v.total)}
+          height={headerHeight(W, title, v.total, v.context)}
         />
         {isEmpty && head('empty')}
         {running.length > 0 && head('run')}
