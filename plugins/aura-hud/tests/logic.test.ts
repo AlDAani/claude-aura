@@ -5,7 +5,7 @@ import type { SessionMessage } from 'claude-code'
 import type { AgentRun } from '../types'
 
 import { importedCostumes } from '../hooks/lib/generated-costumes'
-import { agentSvg, compactSvg, DONE_H, headerHeight, headerSvg, plannedSvg, ROW_H, rowCrabSvg, rowDetailsSvg, rowHeightOf } from '../hooks/lib/draw-pane'
+import { agentSvg, compactSvg, DONE_H, headerHeight, headerSvg, paneWidth, plannedSvg, ROW_H, rowCrabSvg, rowDetailsSvg, rowHeightOf } from '../hooks/lib/draw-pane'
 import { blank, label, merge, readProgress, readStep } from '../hooks/lib/flow'
 import { fitText, textWidth } from '../hooks/lib/format'
 import { toolsHeight, toolsSvg } from '../hooks/lib/draw-history'
@@ -299,7 +299,7 @@ describe('agent history', () => {
       role: 'assistant',
       text: 'Looking at the form first.',
       toolUses: [
-        { tool_use_id: 'u1', tool: 'Read', input: { file_path: '/repo/src/app/login/form.tsx' }, text: 'export const Form = …' },
+        { tool_use_id: 'u1', tool: 'Read', input: { file_path: '/repo/src/app/login/form.tsx' }, text: '1\texport const Form = 1\n2\t\n3\t}' },
         { tool_use_id: 'u2', tool: 'Bash', input: { command: 'npm test\n--watch=false' }, text: 'FAIL login\nstack', isError: true },
       ],
     },
@@ -309,26 +309,84 @@ describe('agent history', () => {
     { role: 'assistant', text: 'Done: the form validates again.', toolUses: [] },
   ]
 
+  const tool = (over: Partial<ToolItem>): ToolItem => ({
+    kind: 'tool',
+    tool: 'Read',
+    title: '',
+    isCode: true,
+    detail: '',
+    outcome: '',
+    meta: '',
+    plus: 0,
+    minus: 0,
+    state: 'ok',
+    error: '',
+    count: 1,
+    ...over,
+  })
+
   test('the brief, the replies and each tool call read in order', () => {
     const h = historyOf(messages, 100)
     expect(h.brief).toBe('Fix the login form\nKeep the API as is.')
     expect(h.blocks.map(b => b.kind)).toEqual(['say', 'tools', 'ask', 'say'])
     const calls = h.blocks[1]
     expect(calls?.kind === 'tools' ? calls.items : []).toEqual([
-      { kind: 'tool', tool: 'Read', what: '…/app/login/form.tsx', state: 'ok', error: '', count: 1 },
-      { kind: 'tool', tool: 'Bash', what: 'npm test', state: 'error', error: 'FAIL login', count: 1 },
-      { kind: 'tool', tool: 'Step', what: '2/5  Fix tests', state: 'running', error: '', count: 1 },
+      tool({ tool: 'Read', title: '…/app/login/form.tsx', meta: '3 lines' }),
+      tool({ tool: 'Bash', title: 'npm test', state: 'error', error: 'FAIL login' }),
+      tool({ tool: 'Step', title: '2/5  Fix tests', isCode: false, state: 'running' }),
     ])
     expect(h.tools).toBe(3)
     expect(h.hidden).toBe(0)
   })
 
-  test('the same call made again in a row folds into one line', () => {
-    const read = { tool_use_id: 'r', tool: 'Read', input: { file_path: '/repo/a.ts' }, text: 'x' }
-    const h = historyOf([{ role: 'user', text: 'Go', toolUses: [] }, { role: 'assistant', text: '', toolUses: [read, read, read] }], 100)
+  test('a command reads as the agent described it, with the command and its outcome under it', () => {
+    const run = {
+      tool_use_id: 'b',
+      tool: 'Bash',
+      input: { command: 'cd /repo && npm run test -w web 2>&1 | grep -E "Test Files|Tests "', description: 'Run web unit tests' },
+      text: '\u001b[32m Test Files  302 passed (302)\u001b[0m\n      Tests  5486 passed (5486)\n',
+    }
+    const h = historyOf([{ role: 'user', text: 'Go', toolUses: [] }, { role: 'assistant', text: '', toolUses: [run] }], 100)
     const calls = h.blocks[0]
-    expect(calls?.kind === 'tools' ? calls.items.map(it => it.count) : []).toEqual([3])
+    expect(calls?.kind === 'tools' ? calls.items[0] : null).toEqual(
+      tool({
+        tool: 'Bash',
+        title: 'Run web unit tests',
+        isCode: false,
+        detail: 'cd /repo && npm run test -w web 2>&1 | grep -E "Test Files|Tests "',
+        outcome: 'Test Files  302 passed (302) · Tests  5486 passed (5486)',
+      }),
+    )
+  })
+
+  test('edits say how much they changed, and repeated edits add up', () => {
+    const edit = (n: number) => ({ tool_use_id: `e${n}`, tool: 'Edit', input: { file_path: '/repo/a.ts', old_string: 'a\nb', new_string: 'a\nb\nc' }, text: 'ok' })
+    const h = historyOf([{ role: 'user', text: 'Go', toolUses: [] }, { role: 'assistant', text: '', toolUses: [edit(1), edit(2), edit(3)] }], 100)
+    const calls = h.blocks[0]
+    const item = calls?.kind === 'tools' ? calls.items[0] : undefined
+    expect(item?.count).toBe(3)
+    expect([item?.plus, item?.minus]).toEqual([9, 6])
     expect(h.tools).toBe(3)
+  })
+
+  test('the handback becomes the report instead of a tool line', () => {
+    const handback = { tool_use_id: 'h', tool: 'SubagentHandback', input: { message: 'All three files are done.\n\nEvery check passed.' }, text: '{"success":true}' }
+    const h = historyOf([{ role: 'user', text: 'Go', toolUses: [] }, { role: 'assistant', text: '', toolUses: [handback] }], 100)
+    expect(h.blocks).toEqual([{ kind: 'say', text: 'All three files are done.\n\nEvery check passed.', isReport: true }])
+    expect(h.tools).toBe(0)
+  })
+
+  test('system reminders never show up as messages', () => {
+    const h = historyOf(
+      [
+        { role: 'user', text: 'Fix it.\n<system-reminder>Report through SubagentHandback.</system-reminder>', toolUses: [] },
+        { role: 'assistant', text: '', toolUses: [] },
+        { role: 'user', text: '<system-reminder>Context is filling up.</system-reminder>', toolUses: [] },
+      ],
+      100,
+    )
+    expect(h.brief).toBe('Fix it.')
+    expect(h.blocks).toEqual([])
   })
 
   test('a long history keeps its newest entries', () => {
@@ -339,22 +397,33 @@ describe('agent history', () => {
 
   test('the timeline keeps every line inside the panel', () => {
     const items: ToolItem[] = [
-      { kind: 'tool', tool: 'Bash', what: 'grep -rn "useCurrentWorkspaceId" web/src --include=*.ts --include=*.tsx | head -10; cat web/src/x.ts', state: 'ok', error: '', count: 1 },
-      { kind: 'tool', tool: 'Read', what: '…/views/backlog/index.tsx', state: 'ok', error: '', count: 2 },
-      { kind: 'tool', tool: 'Bash', what: 'npm test', state: 'error', error: 'FAIL src/login.test.ts > validates the form and shows the error under the field', count: 1 },
-      { kind: 'tool', tool: 'Edit', what: '…/backlog/model/useBacklogHotkeys.ts', state: 'running', error: '', count: 1 },
+      tool({ tool: 'Bash', title: 'Typecheck, filtering known error', isCode: false, detail: 'cd /Users/dan/weDo && npm run typecheck 2>&1 | grep "error TS" | grep -v "task-command"; echo TC_DONE', outcome: 'TC_DONE' }),
+      tool({ tool: 'Read', title: '…/views/backlog/index.tsx', meta: '412 lines', count: 2 }),
+      tool({ tool: 'Edit', title: '…/shared/ui/Breadcrumbs.tsx', plus: 17, minus: 11, count: 4 }),
+      tool({ tool: 'Bash', title: 'npm test', state: 'error', error: 'FAIL src/login.test.ts > validates the form and shows the error under the field' }),
+      tool({ tool: 'navigate · Claude_Browser', title: 'http://localhost:3000/backlog?view=board&filter=mine', state: 'running' }),
     ]
     const W = 420
     const svg = toolsSvg(W, items, 'medium', 'claude')
     expect(svg).toContain(`height="${toolsHeight(items)}"`)
-    expect(toolsHeight(items)).toBe(4 * 24 + 16 + 4)
+    expect(toolsHeight(items)).toBe(5 * 24 + 3 * 16 + 4)
     expect(svg).toContain('×2')
+    expect(svg).toContain('<tspan class="go">+17</tspan> <tspan class="er">−11</tspan>')
+    expect(svg).toContain('↳ TC_DONE')
     expect(svg).toContain('class="live tm"')
-    for (const [, x, size, text] of svg.matchAll(/class="s mono" x="([\d.]+)" y="[\d.]+" font-size="([\d.]+)">([^<]+)</g)) {
-      const shown = (text ?? '').replace(/&quot;/g, '"').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&')
-      expect([...shown].length * Number(size) * 0.62).toBeLessThanOrEqual(W - Number(x) - 6 + 0.01)
+    const decode = (text: string) => text.replace(/&quot;/g, '"').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&')
+    for (const [, x, size, text] of svg.matchAll(/class="(?:s|m) mono" x="([\d.]+)" y="[\d.]+" font-size="([\d.]+)">([^<]+)</g)) {
+      expect([...decode(text ?? '')].length * Number(size) * 0.62).toBeLessThanOrEqual(W - Number(x) - 6 + 0.01)
+    }
+    for (const [, x, size, text] of svg.matchAll(/class="t" x="([\d.]+)" y="[\d.]+" font-size="([\d.]+)">([^<]+)</g)) {
+      expect(textWidth(decode(text ?? ''), Number(size))).toBeLessThanOrEqual(W - Number(x) + 0.01)
     }
     expect(toolsSvg(W, items, 'medium', 'claude')).toBe(svg)
+  })
+
+  test('drawings use the whole width of a wide pane', () => {
+    expect(paneWidth(160)).toBe(1272)
+    expect(paneWidth(20)).toBe(240)
   })
 
   test('MCP tools read as tool and server', () => {

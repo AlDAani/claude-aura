@@ -183,6 +183,7 @@ const INK_RULES = {
   no: (i: Ink) => `.no{stroke:${i.fail}}`,
   id: (i: Ink) => `.id{stroke:${i.idle}}`,
   er: (i: Ink) => `.er{fill:${i.fail}}`,
+  go: (i: Ink) => `.go{fill:${i.ok}}`,
 } as const
 
 export type InkClass = keyof typeof INK_RULES

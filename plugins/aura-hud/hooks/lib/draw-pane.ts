@@ -11,6 +11,7 @@ import { S } from './strings'
 
 const TEXT_CSS = "text{font-family:-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',sans-serif;font-variant-numeric:tabular-nums}"
 
+const MAX_PANE_W = 2400
 export const ROW_H = 66
 export const DONE_H = 56
 export const CRAB_W = 42
@@ -19,7 +20,7 @@ const BODY_DONE_H = 34
 const CRAB_SPRITE_H = 29
 const PULSE_MS = 1600
 
-export const paneWidth = (bodyColumns: number): number => Math.max(240, Math.min(900, (bodyColumns || 40) * 8 - 8))
+export const paneWidth = (bodyColumns: number): number => Math.max(240, Math.min(MAX_PANE_W, (bodyColumns || 40) * 8 - 8))
 export const PLANNED_H = 46
 export const COMPACT_H = 32
 

@@ -16,7 +16,7 @@
       "name": "aura-hud",
       "source": "./plugins/aura-hud",
       "description": "Mod: a live agents panel, in Claude, ChatGPT Dark or WebStorm Islands Dark colors; made for aura-flow, shows any subagents.",
-      "version": "1.5.1",
+      "version": "1.6.0",
       "category": "mod"
     },
     {

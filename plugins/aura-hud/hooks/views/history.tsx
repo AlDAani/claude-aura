@@ -40,23 +40,36 @@ export const historyTree = (ui: Elements[RenderSurface], v: HistoryView, act: Hi
   const lastSay = story ? lastSayOf(story.blocks) : -1
   const back = (key: string) => <Button key={key} plain label={`← ${S.pane}`} onPress={act.back} />
 
-  const toolLine = (it: ToolItem, n: number) => (
-    <Box key={`t${n}`} flexDirection="column">
-      <Text wrap="truncate-end">
-        <Text {...(it.state === 'error' ? { color: 'error' as const } : { dimColor: true })}>{GLYPH[it.state]}</Text> <Text bold>{it.tool}</Text>{' '}
-        <Text dimColor>
-          {it.what}
-          {it.count > 1 ? ` ×${it.count}` : ''}
+  const toolLine = (it: ToolItem, n: number) => {
+    const extra = [it.plus || it.minus ? `+${it.plus} −${it.minus}` : '', it.meta, it.count > 1 ? `×${it.count}` : ''].filter(Boolean).join(' · ')
+    return (
+      <Box key={`t${n}`} flexDirection="column">
+        <Text wrap="truncate-end">
+          <Text {...(it.state === 'error' ? { color: 'error' as const } : { dimColor: true })}>{GLYPH[it.state]}</Text> <Text bold>{it.tool}</Text>{' '}
+          {it.isCode ? <Text dimColor>{it.title}</Text> : <Text>{it.title}</Text>}
+          {extra ? <Text dimColor> · {extra}</Text> : null}
         </Text>
-      </Text>
-      {it.error ? (
-        <Text color="error" wrap="truncate-end">
-          {'  '}
-          {it.error}
-        </Text>
-      ) : null}
-    </Box>
-  )
+        {it.detail ? (
+          <Text dimColor wrap="truncate-end">
+            {'  '}
+            {it.detail}
+          </Text>
+        ) : null}
+        {it.outcome ? (
+          <Text dimColor wrap="truncate-end">
+            {'  ↳ '}
+            {it.outcome}
+          </Text>
+        ) : null}
+        {it.error ? (
+          <Text color="error" wrap="truncate-end">
+            {'  '}
+            {it.error}
+          </Text>
+        ) : null}
+      </Box>
+    )
+  }
 
   const block = (b: Block, n: number) => {
     if (b.kind === 'tools') {
@@ -70,7 +83,7 @@ export const historyTree = (ui: Elements[RenderSurface], v: HistoryView, act: Hi
         </Box>
       )
     }
-    const label = b.kind === 'ask' ? S.followUp : a.status !== 'running' && n === lastSay ? S.report : ''
+    const label = b.kind === 'ask' ? S.followUp : b.isReport || (a.status !== 'running' && n === lastSay) ? S.report : ''
     return (
       <Box key={`b${n}`} flexDirection="column" marginY={1}>
         {label ? <Text dimColor>{label}</Text> : null}

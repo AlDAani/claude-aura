@@ -4,9 +4,22 @@ import { capText } from './format'
 
 export type ToolState = 'ok' | 'error' | 'running'
 
-export type ToolItem = { kind: 'tool'; tool: string; what: string; state: ToolState; error: string; count: number }
+export type ToolItem = {
+  kind: 'tool'
+  tool: string
+  title: string
+  isCode: boolean
+  detail: string
+  outcome: string
+  meta: string
+  plus: number
+  minus: number
+  state: ToolState
+  error: string
+  count: number
+}
 
-type Note = { kind: 'say'; text: string } | { kind: 'ask'; text: string }
+type Note = { kind: 'say'; text: string; isReport: boolean } | { kind: 'ask'; text: string }
 
 type HistoryItem = Note | ToolItem
 
@@ -67,6 +80,93 @@ export const toolWhat = (tool: string, input: Readonly<Record<string, unknown>>)
   }
 }
 
+const ANSI = /\u001b\[[0-9;]*m/g
+const NUMBERED = /^\s*\d+\t/
+const FOUND = /^Found (\d+) (\w+)/
+const HANDBACK = /handback/i
+const REMINDER = /<system-reminder>[\s\S]*?<\/system-reminder>/g
+
+const linesOf = (text: string): string[] =>
+  text
+    .replace(ANSI, '')
+    .split('\n')
+    .map(line => line.trim())
+    .filter(Boolean)
+
+const countLines = (text: string): number => (text ? text.split('\n').length : 0)
+
+const editSize = (tool: string, input: Readonly<Record<string, unknown>>): readonly [number, number] => {
+  if (tool === 'Write') return [countLines(str(input.content)), 0]
+  if (tool === 'Edit') return [countLines(str(input.new_string)), countLines(str(input.old_string))]
+  if (tool === 'MultiEdit' && Array.isArray(input.edits)) {
+    return input.edits.reduce<readonly [number, number]>((sum, edit: unknown) => {
+      const e = edit && typeof edit === 'object' ? (edit as Record<string, unknown>) : {}
+      return [sum[0] + countLines(str(e.new_string)), sum[1] + countLines(str(e.old_string))]
+    }, [0, 0])
+  }
+  return [0, 0]
+}
+
+const metaOf = (tool: string, result: string): string => {
+  if (!result) return ''
+  if (tool === 'Read') {
+    const read = result.split('\n').filter(line => NUMBERED.test(line)).length
+    return read ? `${read} lines` : ''
+  }
+  if (tool === 'Grep' || tool === 'Glob') {
+    const found = FOUND.exec(result)
+    if (found) return `${found[1]} ${found[2]}`
+    if (/^No (files|matches) found/.test(result)) return 'none found'
+    const lines = linesOf(result).length
+    return `${lines} ${tool === 'Glob' ? 'files' : 'lines'}`
+  }
+  return ''
+}
+
+const summaryOf = (tool: string, input: Readonly<Record<string, unknown>>): Pick<ToolItem, 'title' | 'isCode' | 'detail'> => {
+  if (tool === 'Bash') {
+    const command = firstLine(str(input.command))
+    const description = str(input.description).trim()
+    return description ? { title: description, isCode: false, detail: command } : { title: command, isCode: true, detail: '' }
+  }
+  const what = toolWhat(tool, input)
+  const isProse = ['Agent', 'Task', 'Skill', 'WebSearch', 'TodoWrite', STEP_TOOL].includes(tool)
+  return { title: what, isCode: !isProse, detail: '' }
+}
+
+const toolItemOf = (use: SessionMessage['toolUses'][number]): ToolItem | Note => {
+  if (HANDBACK.test(use.tool)) {
+    const text = str(use.input.message) || str(use.input.text) || str(use.input.result) || use.text || ''
+    return { kind: 'say', text: text.trim(), isReport: true }
+  }
+  const state: ToolState = use.isError ? 'error' : use.text === undefined ? 'running' : 'ok'
+  const result = use.text ?? ''
+  const [plus, minus] = state === 'ok' ? editSize(use.tool, use.input) : [0, 0]
+  const summary = summaryOf(use.tool, use.input)
+  return {
+    kind: 'tool',
+    tool: toolName(use.tool),
+    title: capText(summary.title, MAX_LINE),
+    isCode: summary.isCode,
+    detail: capText(summary.detail, MAX_LINE),
+    outcome: state === 'ok' && use.tool === 'Bash' ? capText(linesOf(result).slice(-2).join(' · '), MAX_LINE) : '',
+    meta: state === 'ok' ? metaOf(use.tool, result) : '',
+    plus,
+    minus,
+    state,
+    error: state === 'error' ? capText(firstLine(result), MAX_LINE) : '',
+    count: 1,
+  }
+}
+
+const isRepeat = (last: HistoryItem | undefined, next: ToolItem): last is ToolItem =>
+  last?.kind === 'tool' &&
+  last.state === 'ok' &&
+  next.state === 'ok' &&
+  last.tool === next.tool &&
+  last.title === next.title &&
+  last.detail === next.detail
+
 const blocksOf = (items: readonly HistoryItem[]): Block[] => {
   const blocks: Block[] = []
   for (const it of items) {
@@ -83,24 +183,26 @@ export const historyOf = (messages: readonly SessionMessage[], max: number): His
   let brief = ''
   let tools = 0
   messages.forEach((m, i) => {
-    const text = m.text.trim()
+    const text = m.text.replace(REMINDER, '').trim()
     if (m.role === 'user') {
       if (i === 0) brief = text
       else if (text && !m.toolResults?.length) items.push({ kind: 'ask', text })
       return
     }
-    if (text) items.push({ kind: 'say', text })
+    if (text) items.push({ kind: 'say', text, isReport: false })
     for (const use of m.toolUses) {
-      tools += 1
-      const state: ToolState = use.isError ? 'error' : use.text === undefined ? 'running' : 'ok'
-      const tool = toolName(use.tool)
-      const what = capText(toolWhat(use.tool, use.input), MAX_LINE)
-      const last = items.at(-1)
-      if (last?.kind === 'tool' && last.state === 'ok' && state === 'ok' && last.tool === tool && last.what === what) {
-        items[items.length - 1] = { ...last, count: last.count + 1 }
+      const item = toolItemOf(use)
+      if (item.kind !== 'tool') {
+        if (item.text) items.push(item)
         continue
       }
-      items.push({ kind: 'tool', tool, what, state, error: state === 'error' ? capText(firstLine(use.text ?? ''), MAX_LINE) : '', count: 1 })
+      tools += 1
+      const last = items.at(-1)
+      if (isRepeat(last, item)) {
+        items[items.length - 1] = { ...item, count: last.count + 1, plus: last.plus + item.plus, minus: last.minus + item.minus }
+        continue
+      }
+      items.push(item)
     }
   })
   const hidden = Math.max(0, items.length - max)
