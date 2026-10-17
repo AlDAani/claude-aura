@@ -37,7 +37,6 @@ export const S = {
   lookIs: (setting: string, active: string): string =>
     `Look: ${setting === 'auto' ? `auto (now ${active})` : active}. Choose with /look auto, claude, chatgpt or webstorm.`,
   lookSet: (name: string): string => `Panel palette: ${name}, shown in the agents panel.`,
-  hudOpened: 'Agents panel opened.',
   lookUnknown: (arg: string): string => `Unknown look "${arg}". Choose auto, claude, chatgpt or webstorm.`,
   themeSet: (name: string): string => ` Terminal theme: ${name}.`,
   themeBack: (name: string): string => ` Terminal theme back to ${name}.`,

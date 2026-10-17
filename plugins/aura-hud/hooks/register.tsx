@@ -208,8 +208,9 @@ export const register: Register = on => {
       name: 'look',
       description: 'Pick the palette of the agents panel: auto, claude, chatgpt or webstorm',
       argumentHint: '[auto|claude|chatgpt|webstorm]',
+      immediate: true,
     })
-    await $.command.register({ name: 'hud', description: 'Open the agents panel' })
+    await $.command.register({ name: 'hud', description: 'Open the agents panel', immediate: true })
     await quietly(() => refreshLook($))
     await quietly(() => syncTotal($))
     return started
@@ -227,7 +228,7 @@ export const register: Register = on => {
   on('command.run', { command: 'hud' }, async $ => {
     await update($, panel, prev => ({ ...prev, openRun: '' }))
     await $.ui.open({ id: PANE, title: S.pane, focus: true }).catch(() => undefined)
-    return { text: S.hudOpened }
+    return {}
   })
 
   on('config.set', { key: 'theme' }, async ($, e, next) => {

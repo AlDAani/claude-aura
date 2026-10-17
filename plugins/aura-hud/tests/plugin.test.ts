@@ -211,6 +211,24 @@ test('a row opens the agent history, and back returns to the list', async ($, on
   expect(asked).toContainEqual(expect.objectContaining({ agentId: 'a1' }))
 })
 
+test('the commands run beside a turn instead of waiting for it or ending it', async ($, on) => {
+  const registered: { name: string; immediate?: true }[] = []
+  mock.clock(on, { now: 1_000 })
+  mock.store(on)
+  on('session.start', (_engine, e) => ({ cwd: e.cwd }))
+  on('tool.register', (_engine, e) => ({ value: { tool: e.name } }))
+  on('command.register', (_engine, e) => {
+    registered.push({ name: e.name, immediate: e.immediate })
+    return { value: { command: e.name } }
+  })
+  on('session.usage', () => ({ value: { startedAt: 0, context: { window: 1_000_000 }, rateLimits: [] } }))
+  await $.session.start({ cwd: '/work', surface: 'desktop', isInteractive: true })
+  expect(registered).toEqual([
+    { name: 'look', immediate: true },
+    { name: 'hud', immediate: true },
+  ])
+})
+
 test('/hud opens the agents panel again after it was closed, on the agent list', async ($, on) => {
   const opened: string[] = []
   mock.clock(on, { now: 1_000 })
@@ -224,7 +242,7 @@ test('/hud opens the agents panel again after it was closed, on the agent list',
   const ui = await $.ui.mount({ plugin: PLUGIN, surface: 'desktop', component: 'Pane', requestId: PANE, props: PANE_PROPS })
   await ui.press({ key: 'open-a1' })
   const answer = await $.command.run({ ...COMMAND, command: 'hud', args: '' })
-  expect(answer.text).toContain('Agents panel')
+  expect(answer.text).toBeUndefined()
   expect(opened.at(-1)).toBe(PANE)
   expect(JSON.stringify(await ui.drawn())).not.toContain('Brief')
   await ui.unmount()
