@@ -1,5 +1,6 @@
 import type { Tier } from '../../types'
 
+import { importedCostumes } from './generated-costumes'
 import { tierClass } from './palette'
 import type { Costume } from './runs'
 
@@ -9,6 +10,17 @@ const TIER = 'tier'
 
 type Fill = (x: number, y: number, w: number, h: number, color: string, group?: string) => void
 type Draw = (f: Fill) => void
+
+const drawImported = (f: Fill, name: string): void => {
+  const art = importedCostumes[name]
+  if (!art) return
+  for (const [color, runs] of art) {
+    for (const run of runs.split(' ')) {
+      const [x, y, width] = run.split(',').map(Number)
+      f(x ?? 0, y ?? 0, width ?? 0, 1, color === '#00ffff' ? TIER : color)
+    }
+  }
+}
 
 const stamp = (
   f: Fill,
@@ -156,7 +168,37 @@ const COSTUMES = new Map<Costume, Draw>([
   ],
 ])
 
-const tierOfCostume = (costume: Costume): Tier => (costume === 'explore' ? 'other' : costume)
+const LEGACY_COSTUME_ART: Readonly<Record<string, Costume>> = {
+  'fable-astronaut': 'fable',
+  'opus-detective': 'heavy',
+  'opus-engineer': 'careful',
+  'sonnet-chef': 'medium',
+  'haiku-racer': 'light',
+  'haiku-pirate': 'explore',
+}
+
+for (const [name, legacy] of Object.entries(LEGACY_COSTUME_ART)) {
+  const draw = COSTUMES.get(legacy)
+  if (draw) COSTUMES.set(name as Costume, draw)
+}
+
+for (const name of Object.keys(importedCostumes)) {
+  COSTUMES.set(name as Costume, f => {
+    // The imported template crab is offset (+1,+6) from this renderer.  The
+    // importer has already translated safe-zone costume pixels by (-1,-6).
+    // Paint the costume first, then redraw the canonical animated crab.
+    drawImported(f, name)
+    crabBody(f)
+  })
+}
+
+export const tierOfCostume = (costume: Costume): Tier => {
+  if (costume.startsWith('fable-')) return 'fable'
+  if (costume.startsWith('opus-')) return 'heavy'
+  if (costume.startsWith('sonnet-')) return 'medium'
+  if (costume.startsWith('haiku-')) return 'light'
+  return costume === 'explore' ? 'other' : (costume as Tier)
+}
 
 type Layer = Map<string, string[]>
 
@@ -200,7 +242,7 @@ const BLINK = '@keyframes blink{50%{opacity:.15}}'
 
 const REDUCED = '@media (prefers-reduced-motion: reduce){.run,.run g{animation:none!important}}'
 
-const PROPS: Readonly<Record<Costume, string>> = {
+const PROPS: Readonly<Record<string, string>> = {
   fable:
     '.c-fable.run{animation:float 1s ease-in-out infinite}' +
     '.c-fable.run .la,.c-fable.run .lb,.c-fable.run .bd{animation:none}' +
@@ -226,9 +268,18 @@ const PROPS: Readonly<Record<Costume, string>> = {
   other: '',
 }
 
+const animatedAs = (costume: Costume): Costume => LEGACY_COSTUME_ART[costume] ?? costume
+
 export const crabCss = (walking: Iterable<Costume>): string => {
   const kinds = new Set(walking)
   if (!kinds.size) return ''
-  const blink = kinds.has('fable') || kinds.has('heavy') ? BLINK : ''
-  return WALK + [...kinds].map(c => PROPS[c]).join('') + blink + REDUCED
+  const animatedKinds = new Set([...kinds].map(animatedAs))
+  const blink = animatedKinds.has('fable') || animatedKinds.has('heavy') ? BLINK : ''
+  const propCss = [...kinds]
+    .map(costume => {
+      const original = animatedAs(costume)
+      return (PROPS[original] ?? '').replaceAll(`.c-${original}`, `.c-${costume}`)
+    })
+    .join('')
+  return WALK + propCss + blink + REDUCED
 }

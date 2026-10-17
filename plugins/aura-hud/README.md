@@ -8,6 +8,8 @@ A Claude Code mod: a live panel of subagents. Made for the [aura-flow](../aura-f
 
 - **Agents panel**: opens by itself when subagents start working, and once per batch: closed, it stays closed until the next batch. It shows the flow's title and plan, the cost and tokens of the agents it lists and the time they spent running, and the cost of the whole session (the main thread and every subagent, the figure `/cost` shows). It lists running, finished and planned subagents with model, effort, task progress, context, estimated cost and time. Clicking a subagent's title opens its history in the panel, scrolled to its latest entries: its brief, what it wrote, and a timeline of its tool calls, one line each, repeats folded and errors in red; a running one fills in as it works, and ← Agents goes back to the list. Working crabs walk, and each tier animates its prop: the astronaut floats, the detective sweeps the magnifier, the engineer turns the wrench, the chef tosses the omelette, the racer runs with a fluttering flag. `prefers-reduced-motion` stops them. The panel lists the 40 newest finished runs.
 
+Each Fable, Opus, Sonnet, and Haiku agent receives one of eight costumes when it starts and keeps that choice for its lifetime. Unknown models use the plain crab. The generated source art, normalized 32×32 exports, prompt metadata, and a light/dark contact sheet live in `assets/costumes/`. From this plugin folder, rerun `node tools/import-costumes.mjs` to rebuild from its bundled `assets/costumes/source/` PNGs; pass another input directory to import replacements.
+
 ## Palettes
 
 `/look` picks the palette the panel draws with:

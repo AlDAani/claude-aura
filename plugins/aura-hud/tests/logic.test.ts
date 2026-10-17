@@ -4,6 +4,7 @@ import type { SessionMessage } from 'claude-code'
 
 import type { AgentRun } from '../types'
 
+import { importedCostumes } from '../hooks/lib/generated-costumes'
 import { agentSvg, compactSvg, DONE_H, headerHeight, headerSvg, plannedSvg, ROW_H, rowCrabSvg, rowDetailsSvg, rowHeightOf } from '../hooks/lib/draw-pane'
 import { blank, label, merge, readProgress, readStep } from '../hooks/lib/flow'
 import { fitText, textWidth } from '../hooks/lib/format'
@@ -12,7 +13,7 @@ import { historyOf, toolName } from '../hooks/lib/history'
 import type { ToolItem } from '../hooks/lib/history'
 import { ratesOf, windowOf } from '../hooks/lib/model'
 import { lookOfTheme, paletteCss, paletteOf } from '../hooks/lib/palette'
-import { costumeOf, crewOf, tierOf, totalsOf } from '../hooks/lib/runs'
+import { addRun, costumeOf, crewOf, newCostumeOf, tierOf, totalsOf } from '../hooks/lib/runs'
 import { plural } from '../hooks/lib/strings'
 
 const run = (over: Partial<AgentRun>): AgentRun => ({
@@ -118,6 +119,16 @@ describe('labels and crew', () => {
     expect(costumeOf('Explore')).toBe('explore')
   })
 
+  test('a known model picks one costume once, while an unknown model stays plain', () => {
+    expect(newCostumeOf('aura-heavy', 'claude-fable-5-1', () => 0)).toBe('fable-wizard')
+    expect(newCostumeOf('aura-heavy', 'claude-haiku-5-5', () => 0.999)).toBe('haiku-pilot')
+    expect(newCostumeOf('aura-heavy', 'gpt-6.1-sol', () => 0)).toBe('other')
+    expect(costumeOf('aura-heavy', 'gpt-6.1-sol', 'a1')).toBe('other')
+    const [spawned] = addRun([], { description: 'Draw icons', subagentType: 'aura-heavy', tool_use_id: 't1' }, { agentId: 'a1', model: 'claude-opus-5-5' }, 0)
+    expect(spawned?.costume).toMatch(/^opus-/)
+    expect(costumeOf(spawned?.type ?? '', spawned?.model, spawned?.id, spawned?.costume)).toBe(spawned?.costume)
+  })
+
   test('English plurals', () => {
     expect(plural(1, 'agent', 'agents')).toBe('agent')
     expect(plural(2, 'agent', 'agents')).toBe('agents')
@@ -142,6 +153,28 @@ describe('drawing', () => {
   test('a still crab carries no animation css', () => {
     expect(agentSvg(600, run({ status: 'done', endedAt: 5_000 }), 9_000, 'claude')).not.toContain('@keyframes st')
     expect(agentSvg(600, run({}), 9_000, 'claude')).toContain('@keyframes st')
+  })
+
+  test('imported art uses safe runtime bounds and keeps the canonical crab plus its tier CSS', () => {
+    expect(Object.keys(importedCostumes)).toHaveLength(26)
+    for (const art of Object.values(importedCostumes)) {
+      let accents = 0
+      for (const [color, runs] of art) {
+        for (const run of runs.split(' ')) {
+          const [x, y, width] = run.split(',').map(Number)
+          expect(x).toBeGreaterThanOrEqual(0)
+          expect(x + width).toBeLessThanOrEqual(31)
+          expect(y).toBeGreaterThanOrEqual(0)
+          expect(y).toBeLessThanOrEqual(21)
+          if (color === '#00ffff') accents += width
+        }
+      }
+      expect(accents).toBeGreaterThanOrEqual(2)
+      expect(accents).toBeLessThanOrEqual(12)
+    }
+    const icon = rowCrabSvg(run({ model: 'claude-fable-5-1', costume: 'fable-wizard' }), 'claude')
+    expect(icon).toContain('M7 10h16v12h-16z')
+    expect(icon).toContain('.tf{fill:')
   })
 
   test('the header adds a session tile once the session total is known', () => {

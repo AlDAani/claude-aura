@@ -1,6 +1,6 @@
 import type { AgentRun, AgentStatus, Look, Tier } from '../../types'
 
-import { crab, crabCss } from './crab'
+import { crab, crabCss, tierOfCostume } from './crab'
 import { fitText, fmtCost, fmtTime, fmtTokens, fmtUsd, textWidth, xml } from './format'
 import { modelName } from './model'
 import { paletteCss, paletteOf, tierClass } from './palette'
@@ -129,8 +129,6 @@ const sweepCss = (from: number, to: number, at: number): string =>
   `@keyframes sl{from{transform:translateX(${from}px)}to{transform:translateX(${to}px)}}` +
   '@media (prefers-reduced-motion: reduce){.sl{animation:none}}'
 
-const costumeTier = (costume: Costume): Tier => (costume === 'explore' ? 'other' : costume)
-
 type Part = { svg: string; css: string }
 
 const detailsOf = (x0: number, y0: number, textW: number, a: AgentRun, at: number, tier: Tier): Part => {
@@ -164,7 +162,7 @@ const detailsOf = (x0: number, y0: number, textW: number, a: AgentRun, at: numbe
 }
 
 const runKey = (kind: string, W: number, a: AgentRun, at: number, lookId: Look): string =>
-  [kind, lookId, W, a.id, a.status, a.type, a.description, a.model, a.effort, a.round, a.stepDone, a.stepTotal, a.stepNote]
+  [kind, lookId, W, a.id, a.status, a.type, a.description, a.model, a.costume, a.effort, a.round, a.stepDone, a.stepTotal, a.stepNote]
     .concat([ctxOf(a), fmtCost(a.costUsd), fmtTime(elapsedOf(a, at)), progressOf(a) ?? '', a.status === 'running' ? at : ''])
     .join(SEP)
 
@@ -176,9 +174,9 @@ export const agentSvg = (W: number, a: AgentRun, at: number, lookId: Look): stri
   const textW = W - CRAB_W - 22
   const isRunning = a.status === 'running'
   const H = rowHeightOf(a)
-  const costume = costumeOf(a.type)
+  const costume = costumeOf(a.type, a.model, a.id, a.costume)
   const part = detailsOf(CRAB_W, 22, textW, a, at, tier)
-  const css = paletteCss(paletteOf(lookId), ROW_INK, [tier, costumeTier(costume)]) + (isRunning ? crabCss([costume]) : '') + part.css
+  const css = paletteCss(paletteOf(lookId), ROW_INK, [tier, tierOfCostume(costume)]) + (isRunning ? crabCss([costume]) : '') + part.css
   const body =
     crab(0, isRunning ? 14 : 10, costume, false, isRunning, CRAB_SCALE) +
     `<text class="t" x="${CRAB_W}" y="18" font-size="13" font-weight="600">${xml(fitText(a.description || a.type, 13, textW))}</text>` +
@@ -190,12 +188,12 @@ export const agentSvg = (W: number, a: AgentRun, at: number, lookId: Look): stri
 
 export const rowCrabSvg = (a: AgentRun, lookId: Look): string => {
   const isRunning = a.status === 'running'
-  const costume = costumeOf(a.type)
+  const costume = costumeOf(a.type, a.model, a.id, a.costume)
   const H = rowHeightOf(a)
   const key = ['crab', lookId, costume, isRunning, H].join(SEP)
   const hit = cache.get(key)
   if (hit !== undefined) return hit
-  const css = paletteCss(paletteOf(lookId), [], [costumeTier(costume)]) + (isRunning ? crabCss([costume]) : '')
+  const css = paletteCss(paletteOf(lookId), [], [tierOfCostume(costume)]) + (isRunning ? crabCss([costume]) : '')
   return remember(key, svg(CRAB_W, H, css, crab(0, Math.round((H - CRAB_SPRITE_H) / 2) - 2, costume, false, isRunning, CRAB_SCALE)))
 }
 
@@ -241,7 +239,7 @@ export const compactSvg = (
 ): string => {
   const summary = totalsText(t, total)
   const runIcon = (a: AgentRun): Icon => ({
-    costume: costumeOf(a.type),
+    costume: costumeOf(a.type, a.model, a.id, a.costume),
     tier: tierOf(a.type),
     isRunning: a.status === 'running',
     isDim: false,

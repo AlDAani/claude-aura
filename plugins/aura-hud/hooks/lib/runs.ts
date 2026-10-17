@@ -6,8 +6,6 @@ import { norm } from './format'
 import { costOf, sumUsage, windowOf } from './model'
 import type { Usage } from './model'
 
-export type Costume = Tier | 'explore'
-
 export type Planned = PlannedTask & { n: number }
 
 export type Totals = { cost: number; tokens: number; time: number }
@@ -27,7 +25,52 @@ export const tierOf = (type: string): Tier => {
   return (WORKER_TIERS as readonly string[]).includes(t) ? (t as Tier) : 'other'
 }
 
-export const costumeOf = (type: string): Costume => (type === 'Explore' ? 'explore' : tierOf(type))
+export const COSTUMES_BY_MODEL = {
+  fable: ['fable-wizard', 'fable-astronaut', 'fable-knight', 'fable-royal', 'fable-oracle', 'fable-dragon', 'fable-alchemist', 'fable-stargazer'],
+  opus: ['opus-detective', 'opus-engineer', 'opus-professor', 'opus-surgeon', 'opus-judge', 'opus-captain', 'opus-scientist', 'opus-conductor'],
+  sonnet: ['sonnet-chef', 'sonnet-painter', 'sonnet-poet', 'sonnet-musician', 'sonnet-barista', 'sonnet-gardener', 'sonnet-photographer', 'sonnet-dj'],
+  haiku: ['haiku-racer', 'haiku-pirate', 'haiku-skater', 'haiku-ninja', 'haiku-courier', 'haiku-sprinter', 'haiku-surfer', 'haiku-pilot'],
+} as const
+
+type ModelFamily = keyof typeof COSTUMES_BY_MODEL
+
+export type ModelCostume = (typeof COSTUMES_BY_MODEL)[ModelFamily][number]
+
+export type Costume = Tier | 'explore' | ModelCostume
+
+const ALL_MODEL_COSTUMES = new Set<string>(Object.values(COSTUMES_BY_MODEL).flat())
+
+const isCostume = (value: string): value is Costume =>
+  value === 'explore' || (['fable', 'heavy', 'careful', 'medium', 'light', 'other'] as readonly string[]).includes(value) || ALL_MODEL_COSTUMES.has(value)
+
+const familyOf = (model: string): ModelFamily | null => {
+  const found = /(?:^|[-:])(fable|opus|sonnet|haiku)(?:[-:]|$)/i.exec(model)
+  return found ? (found[1].toLowerCase() as ModelFamily) : null
+}
+
+const legacyCostumeOf = (type: string): Costume => (type === 'Explore' ? 'explore' : tierOf(type))
+
+const stableIndex = (key: string, length: number): number => {
+  let hash = 2166136261
+  for (let i = 0; i < key.length; i += 1) hash = Math.imul(hash ^ key.charCodeAt(i), 16777619)
+  return (hash >>> 0) % length
+}
+
+export const newCostumeOf = (type: string, model: string, random = Math.random): Costume => {
+  const family = familyOf(model)
+  if (!family) return model ? 'other' : legacyCostumeOf(type)
+  const set = COSTUMES_BY_MODEL[family]
+  return set[Math.min(set.length - 1, Math.floor(random() * set.length))] as Costume
+}
+
+/** Returns the stored choice, with a stable migration path for runs saved before costumes existed. */
+export const costumeOf = (type: string, model = '', id = '', stored?: string): Costume => {
+  if (stored && isCostume(stored)) return stored
+  const family = familyOf(model)
+  if (!family) return model ? 'other' : legacyCostumeOf(type)
+  const set = COSTUMES_BY_MODEL[family]
+  return set[stableIndex(id || `${type}/${model}`, set.length)] as Costume
+}
 
 export const plannedOf = (f: Flow | null, list: readonly AgentRun[]): Planned[] => {
   const tasks = f && !f.isFinished ? (f.tasks ?? []) : []
@@ -83,6 +126,7 @@ export const addRun = (list: readonly AgentRun[], e: SpawnInput, started: SpawnR
     type: e.subagentType,
     description: e.description,
     model: started.model,
+    costume: newCostumeOf(e.subagentType, started.model),
     status: 'running',
     startedAt: at,
     contextTokens: 0,
