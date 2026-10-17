@@ -80,7 +80,7 @@ export const historyTree = (ui: Elements[RenderSurface], v: HistoryView, act: Hi
   }
 
   const header = svgUi ? (
-    <svgUi.Svg source={agentSvg(W, a, v.at, v.look)} alt={rowAlt(a, v.at)} width={W} height={rowHeightOf(a)} />
+    <svgUi.Svg source={agentSvg(W, a, v.at, v.look)} alt={rowAlt(a)} width={W} height={rowHeightOf(a)} />
   ) : (
     <Box flexDirection="column">
       <Text bold wrap="truncate-end">

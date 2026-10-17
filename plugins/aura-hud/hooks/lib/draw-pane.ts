@@ -1,12 +1,12 @@
 import type { AgentRun, AgentStatus, Look, Tier } from '../../types'
 
 import { crab, crabCss, tierOfCostume } from './crab'
-import { fitText, fmtCost, fmtTime, fmtTokens, fmtUsd, textWidth, xml } from './format'
+import { fitText, fmtCost, fmtTokens, fmtUsd, textWidth, xml } from './format'
 import { modelName } from './model'
 import { paletteCss, paletteOf, tierClass } from './palette'
 import type { InkClass } from './palette'
 import type { Costume, Planned, Totals } from './runs'
-import { costumeOf, ctxOf, elapsedOf, progressOf, showsSteps, tierOf } from './runs'
+import { costumeOf, ctxOf, progressOf, showsSteps, tierOf } from './runs'
 import { S } from './strings'
 
 const TEXT_CSS = "text{font-family:-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',sans-serif;font-variant-numeric:tabular-nums}"
@@ -75,7 +75,6 @@ const tilesOf = (t: Totals, total: number | null, context: number | null): (read
   const tiles: (readonly [string, string])[] = [
     [S.cost, '≈' + fmtCost(t.cost)],
     [S.tokens, fmtTokens(t.tokens)],
-    [S.time, fmtTime(t.time)],
   ]
   if (total !== null) tiles.push([S.session, fmtUsd(total)])
   if (context !== null) tiles.push([S.context, `${context}%`])
@@ -88,7 +87,7 @@ const columnsOf = (W: number, count: number): number => {
 }
 
 export const headerHeight = (W: number, title: string, total: number | null, context: number | null): number => {
-  const count = 3 + (total === null ? 0 : 1) + (context === null ? 0 : 1)
+  const count = 2 + (total === null ? 0 : 1) + (context === null ? 0 : 1)
   return (title ? 28 : 0) + Math.ceil(count / columnsOf(W, count)) * (TILE_H + TILE_GAP) - 2
 }
 
@@ -96,7 +95,7 @@ const valueSize = (value: string, maxW: number): number =>
   Math.floor(Math.max(10, Math.min(VALUE_SIZE, (VALUE_SIZE * maxW) / Math.max(1, textWidth(value, VALUE_SIZE)))) * 2) / 2
 
 export const totalsText = (t: Totals, total: number | null, context: number | null): string =>
-  `≈${fmtCost(t.cost)} · ${fmtTokens(t.tokens)} · ${fmtTime(t.time)}` +
+  `≈${fmtCost(t.cost)} · ${fmtTokens(t.tokens)}` +
   (total === null ? '' : ` · ${S.sessionWord} ${fmtUsd(total)}`) +
   (context === null ? '' : ` · ${S.contextWord} ${context}%`)
 
@@ -139,7 +138,7 @@ const detailsOf = (x0: number, y0: number, textW: number, a: AgentRun, at: numbe
   const isRunning = a.status === 'running'
   const meta = [modelName(a.model), a.effort ?? '', a.round > 1 ? `${S.round} ${a.round}` : ''].filter(Boolean)
   const progress = isRunning ? progressOf(a) : null
-  const stats = `${S.ctx} ${ctxOf(a)}% · ≈${fmtCost(a.costUsd)} · ${fmtTime(elapsedOf(a, at))}`
+  const stats = `${S.ctx} ${ctxOf(a)}% · ≈${fmtCost(a.costUsd)}`
   const steps = showsSteps(a) ? `${a.stepDone ?? 0}/${a.stepTotal}${a.stepNote ? ' · ' + a.stepNote : ''}` : ''
   const stepsW = Math.max(0, textW - textWidth(stats, 11) - 12)
   const barY = y0 + 33
@@ -162,7 +161,7 @@ const detailsOf = (x0: number, y0: number, textW: number, a: AgentRun, at: numbe
 
 const runKey = (kind: string, W: number, a: AgentRun, at: number, lookId: Look): string =>
   [kind, lookId, W, a.id, a.status, a.type, a.description, a.model, a.costume, a.effort, a.round, a.stepDone, a.stepTotal, a.stepNote]
-    .concat([ctxOf(a), fmtCost(a.costUsd), fmtTime(elapsedOf(a, at)), progressOf(a) ?? '', a.status === 'running' ? at : ''])
+    .concat([ctxOf(a), fmtCost(a.costUsd), progressOf(a) ?? '', a.status === 'running' ? at : ''])
     .join(SEP)
 
 export const agentSvg = (W: number, a: AgentRun, at: number, lookId: Look): string => {

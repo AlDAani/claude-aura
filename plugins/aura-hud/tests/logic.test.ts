@@ -13,7 +13,7 @@ import { historyOf, toolName } from '../hooks/lib/history'
 import type { ToolItem } from '../hooks/lib/history'
 import { ratesOf, windowOf } from '../hooks/lib/model'
 import { lookOfTheme, paletteCss, paletteOf } from '../hooks/lib/palette'
-import { addRun, costumeOf, crewOf, newCostumeOf, tierOf, totalsOf } from '../hooks/lib/runs'
+import { addRun, costumeOf, crewOf, newCostumeOf, tierOf } from '../hooks/lib/runs'
 import { plural } from '../hooks/lib/strings'
 
 const run = (over: Partial<AgentRun>): AgentRun => ({
@@ -178,7 +178,7 @@ describe('drawing', () => {
   })
 
   test('the header adds a session tile once the session total is known', () => {
-    const totals = { cost: 5.16, tokens: 14_500_000, time: 2_503_000 }
+    const totals = { cost: 5.16, tokens: 14_500_000 }
     const withTotal = headerSvg(600, 'Aura flow', totals, 250.47, null, 'claude')
     expect(withTotal).toContain('>Session cost<')
     expect(withTotal).toContain('>Agent cost<')
@@ -188,26 +188,27 @@ describe('drawing', () => {
   })
 
   test('the header shows the main session context, in red once it runs high', () => {
-    const totals = { cost: 5.16, tokens: 14_500_000, time: 2_503_000 }
+    const totals = { cost: 5.16, tokens: 14_500_000 }
     const calm = headerSvg(472, '', totals, 18.5, 34, 'claude')
     expect(calm).toContain('>Main context<')
     expect(calm).toContain('class="t" x="')
     expect(calm).toMatch(/class="t" x="[\d.]+" y="[\d.]+" font-size="[\d.]+" font-weight="600">34%</)
-    expect((calm.match(/class="tile"/g) ?? []).length).toBe(5)
+    expect((calm.match(/class="tile"/g) ?? []).length).toBe(4)
+    expect(calm).not.toContain('>Time<')
     expect(new Set([...calm.matchAll(/class="tile" x="[\d.]+" y="([\d.]+)"/g)].map(m => m[1])).size).toBe(1)
     const hot = headerSvg(472, '', totals, 18.5, 91, 'claude')
     expect(hot).toMatch(/class="er" x="[\d.]+" y="[\d.]+" font-size="[\d.]+" font-weight="600">91%</)
-    expect(new Set([...headerSvg(400, '', totals, 18.5, 34, 'claude').matchAll(/class="tile" x="[\d.]+" y="([\d.]+)"/g)].map(m => m[1])).size).toBe(2)
+    expect(new Set([...headerSvg(300, '', totals, 18.5, 34, 'claude').matchAll(/class="tile" x="[\d.]+" y="([\d.]+)"/g)].map(m => m[1])).size).toBe(2)
   })
 
   test('a narrow header wraps its tiles instead of squeezing the numbers', () => {
-    const totals = { cost: 5.16, tokens: 14_500_000, time: 2_503_000 }
+    const totals = { cost: 5.16, tokens: 14_500_000 }
     for (const W of [240, 359, 360, 600]) {
       const svg = headerSvg(W, 'Aura flow', totals, 12_345.67, null, 'claude')
       const widths = [...svg.matchAll(/class="tile" x="[\d.]+" y="[\d.]+" width="([\d.]+)"/g)].map(m => Number(m[1]))
       const values = [...svg.matchAll(/font-size="([\d.]+)" font-weight="600">([^<]+)</g)].slice(1)
-      expect(widths.length).toBe(4)
-      expect(values.length).toBe(4)
+      expect(widths.length).toBe(3)
+      expect(values.length).toBe(3)
       values.forEach(([, size, value], i) => {
         expect(Number(size)).toBeGreaterThanOrEqual(12)
         expect(textWidth(value ?? '', Number(size))).toBeLessThanOrEqual((widths[i] ?? 0) - 18 + 0.01)
@@ -219,7 +220,7 @@ describe('drawing', () => {
   })
 
   test('the compact strip carries the session total and leaves room for it', () => {
-    const totals = { cost: 1, tokens: 1_000, time: 60_000 }
+    const totals = { cost: 1, tokens: 1_000 }
     const runs = Array.from({ length: 30 }, (_, i) => run({ id: `r${i}`, status: 'done', endedAt: 5_000 }))
     const strip = compactSvg(600, runs, [], totals, 250.47, 34, 'claude', 9_000)
     expect(strip).toContain('session $250.47 · main ctx 34%')
@@ -273,7 +274,7 @@ describe('drawing', () => {
   test('row text uses one separator and no duplicate context figure', () => {
     const row = agentSvg(600, run({ effort: 'high', contextTokens: 120_000 }), 9_000, 'claude')
     expect(row).toContain('<tspan class="s"> · Opus 5.5 · high</tspan>')
-    expect(row).toContain('ctx 12% · ≈$0.42 · 0:09')
+    expect(row).toContain('ctx 12% · ≈$0.42<')
     expect(row).not.toContain('120k')
   })
 
@@ -281,15 +282,6 @@ describe('drawing', () => {
     const planned = plannedSvg(600, { n: 2, title: 'Wire the store', tier: 'heavy', after: [1] }, 'claude')
     expect(planned).toContain('xhigh effort · after 1')
     expect(planned).not.toContain('Opus')
-  })
-
-  test('time counts only while agents run, not the gaps between batches', () => {
-    const first = run({ id: 'a', status: 'done', startedAt: 0, endedAt: 60_000 })
-    const second = run({ id: 'b', status: 'done', startedAt: 600_000, endedAt: 660_000 })
-    const overlapping = run({ id: 'c', status: 'done', startedAt: 30_000, endedAt: 90_000 })
-    expect(totalsOf([first, second], 700_000).time).toBe(120_000)
-    expect(totalsOf([first, overlapping, second], 700_000).time).toBe(150_000)
-    expect(totalsOf([], 700_000).time).toBe(0)
   })
 
   test('fitText cuts to the width with an ellipsis', () => {

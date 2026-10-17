@@ -18,10 +18,10 @@ import {
   rowHeightOf,
   TIER_EFFORT,
 } from '../lib/draw-pane'
-import { fitText, fmtCost, fmtTime, fmtTokens, fmtUsd, textBar } from '../lib/format'
+import { fitText, fmtCost, fmtTokens, fmtUsd, textBar } from '../lib/format'
 import { modelName } from '../lib/model'
 import { paletteOf, tierHex } from '../lib/palette'
-import { ctxOf, elapsedOf, plannedOf, progressOf, showsSteps, tierOf, totalsOf } from '../lib/runs'
+import { ctxOf, plannedOf, progressOf, showsSteps, tierOf, totalsOf } from '../lib/runs'
 import { plural, S } from '../lib/strings'
 
 const STATUS_GLYPH: Readonly<Record<AgentStatus, string>> = { running: '●', done: '✓', failed: '✗' }
@@ -35,11 +35,11 @@ export const stateWord = (status: AgentStatus): string =>
 
 export const modelLine = (a: AgentRun): string => (a.effort ? `${modelName(a.model)} · ${a.effort}` : modelName(a.model))
 
-export const rowAlt = (a: AgentRun, at: number): string => {
+export const rowAlt = (a: AgentRun): string => {
   const tier = tierOf(a.type)
   const parts = [`${a.description || a.type}: ${tier === 'other' ? a.type : tier}`, modelLine(a), stateWord(a.status)]
   if (showsSteps(a)) parts.push(`step ${a.stepDone ?? 0} of ${a.stepTotal}${a.stepNote ? `, ${a.stepNote}` : ''}`)
-  parts.push(`${S.ctx} ${ctxOf(a)}%`, `≈${fmtCost(a.costUsd)}`, fmtTime(elapsedOf(a, at)))
+  parts.push(`${S.ctx} ${ctxOf(a)}%`, `≈${fmtCost(a.costUsd)}`)
   return parts.join(', ')
 }
 
@@ -68,13 +68,13 @@ export const paneTree = (ui: Elements[RenderSurface], v: PaneView, act: PaneActi
   const finished = finishedAll.slice(0, MAX_FINISHED_ROWS)
   const hidden = finishedAll.length - finished.length
   const planned = plannedOf(f, list)
-  const t = totalsOf(list, at)
+  const t = totalsOf(list)
   const title = f && !f.isFinished ? f.title : ''
   const isEmpty = list.length === 0 && planned.length === 0
   const sessionText = [v.total === null ? '' : `${S.sessionWord} ${fmtUsd(v.total)}`, v.context === null ? '' : `${S.contextWord} ${v.context}%`]
     .filter(Boolean)
     .join(' · ')
-  const summary = [`≈${fmtCost(t.cost)}`, `${fmtTokens(t.tokens)} ${plural(t.tokens, 'token', 'tokens')}`, fmtTime(t.time), sessionText]
+  const summary = [`≈${fmtCost(t.cost)}`, `${fmtTokens(t.tokens)} ${plural(t.tokens, 'token', 'tokens')}`, sessionText]
     .filter(Boolean)
     .join(', ')
 
@@ -121,7 +121,7 @@ export const paneTree = (ui: Elements[RenderSurface], v: PaneView, act: PaneActi
         <Svg source={rowCrabSvg(a, lookId)} alt={`${tierOf(a.type)} crab`} width={CRAB_W} height={rowHeightOf(a)} />
         <Box flexDirection="column" flexGrow={1}>
           {titleOf(a, bodyW - 8)}
-          <Svg source={rowDetailsSvg(bodyW, a, at, lookId)} alt={rowAlt(a, at)} width={bodyW} height={bodyHeightOf(a)} />
+          <Svg source={rowDetailsSvg(bodyW, a, at, lookId)} alt={rowAlt(a)} width={bodyW} height={bodyHeightOf(a)} />
         </Box>
       </Box>
     )
@@ -212,7 +212,7 @@ export const paneTree = (ui: Elements[RenderSurface], v: PaneView, act: PaneActi
           {progress === null ? null : <Text color={color}>{textBar(progress, barW)} </Text>}
           <Text dimColor>
             {steps}
-            {S.ctx} {ctx}% · ≈{fmtCost(a.costUsd)} · {fmtTime(elapsedOf(a, at))}
+            {S.ctx} {ctx}% · ≈{fmtCost(a.costUsd)}
           </Text>
         </Text>
       </Box>
@@ -228,7 +228,7 @@ export const paneTree = (ui: Elements[RenderSurface], v: PaneView, act: PaneActi
         {toggleCompact}
       </Box>
       <Text dimColor>
-        ≈{fmtCost(t.cost)} · {fmtTokens(t.tokens)} {plural(t.tokens, 'token', 'tokens')} · {fmtTime(t.time)}
+        ≈{fmtCost(t.cost)} · {fmtTokens(t.tokens)} {plural(t.tokens, 'token', 'tokens')}
         {sessionText && ` · ${sessionText}`}
       </Text>
       {p.isCompact ? (

@@ -8,7 +8,7 @@ import type { Usage } from './model'
 
 export type Planned = PlannedTask & { n: number }
 
-export type Totals = { cost: number; tokens: number; time: number }
+export type Totals = { cost: number; tokens: number }
 
 export type SpawnInput = { description: string; subagentType: string; tool_use_id: string }
 
@@ -78,29 +78,14 @@ export const plannedOf = (f: Flow | null, list: readonly AgentRun[]): Planned[] 
   return tasks.map((t, i) => ({ ...t, n: i + 1 })).filter(t => !started.has(norm(t.title)))
 }
 
-const activeTime = (spans: readonly (readonly [number, number])[]): number => {
-  let time = 0
-  let from = 0
-  let to = -Infinity
-  for (const [start, end] of [...spans].sort((x, y) => x[0] - y[0])) {
-    if (start > to) {
-      if (to > from) time += to - from
-      from = start
-      to = end
-    } else to = Math.max(to, end)
-  }
-  return to > from ? time + to - from : time
-}
-
-export const totalsOf = (list: readonly AgentRun[], at: number): Totals => {
+export const totalsOf = (list: readonly AgentRun[]): Totals => {
   let cost = 0
   let tokens = 0
   for (const a of list) {
     cost += a.costUsd
     tokens += a.tokens
   }
-  const spans = list.map(a => [a.startedAt, a.endedAt ?? Math.max(at, a.startedAt)] as const)
-  return { cost, tokens, time: activeTime(spans) }
+  return { cost, tokens }
 }
 
 export const progressOf = (a: AgentRun): number | null => {
@@ -114,7 +99,6 @@ export const showsSteps = (a: AgentRun): boolean => Boolean(a.stepTotal) && a.st
 export const ctxOf = (a: AgentRun): number =>
   a.contextMax ? Math.min(100, Math.round((a.contextTokens / a.contextMax) * 100)) : 0
 
-export const elapsedOf = (a: AgentRun, at: number): number => (a.endedAt ?? Math.max(at, a.startedAt)) - a.startedAt
 
 export const addRun = (list: readonly AgentRun[], e: SpawnInput, started: SpawnResult, at: number): AgentRun[] => {
   const key = norm(e.description)

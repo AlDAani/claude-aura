@@ -93,14 +93,6 @@ async function reveal($: EngineInterface, to: UiScrollTarget, block: UiScrollBlo
   await $.ui.scroll({ in: PANE, to, block })
 }
 
-async function tick($: EngineInterface): Promise<void> {
-  if (!(await read($, crew)).running) return
-  const pane = (await $.ui.panes()).find(p => p.id === PANE)
-  if (!pane?.isShown || !pane.isPlaced) return
-  const at = await $.clock.now()
-  await update($, now, () => at)
-}
-
 async function storedLook($: EngineInterface): Promise<LookSetting> {
   try {
     const value = await $.store.get(LOOK_KEY)
@@ -222,7 +214,6 @@ export const register: Register = on => {
     })
     await quietly(() => refreshLook($))
     await quietly(() => syncTotal($))
-    $.clock.every(1000, () => void quietly(() => tick($)))
     return started
   })
 

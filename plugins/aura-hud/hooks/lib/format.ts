@@ -9,14 +9,6 @@ export const fmtCost = (usd: number): string => `$${usd < 10 ? usd.toFixed(2) : 
 
 export const fmtUsd = (usd: number): string => `$${usd.toFixed(2)}`
 
-export const fmtTime = (ms: number): string => {
-  const s = Math.max(0, Math.round(ms / 1000))
-  const h = Math.floor(s / 3600)
-  const m = Math.floor((s % 3600) / 60)
-  const ss = String(s % 60).padStart(2, '0')
-  return h ? `${h}:${String(m).padStart(2, '0')}:${ss}` : `${m}:${ss}`
-}
-
 const NARROW = /[\s.,:;'|!il1()[\]]/
 const WIDE = /[A-ZА-ЯЁmwшщжюМШЩЖЮ@%]/
 const ELLIPSIS_EM = 0.56

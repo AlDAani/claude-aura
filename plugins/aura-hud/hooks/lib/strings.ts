@@ -2,7 +2,6 @@ export const S = {
   pane: 'Agents',
   cost: 'Agent cost',
   tokens: 'Tokens',
-  time: 'Time',
   session: 'Session cost',
   context: 'Main context',
   contextWord: 'main ctx',
