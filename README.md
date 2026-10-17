@@ -16,8 +16,9 @@ aura-flow and aura-hud work on their own and light up together: with both instal
 | --- | --- |
 | `/flow <task>` | Plans the task, hands it to tiered worker agents and reviews what they return. The full name is `/aura-flow:flow`, for when another command already uses `/flow`. |
 | `/look [auto\|claude\|chatgpt\|webstorm]` | Picks the colors of the agents panel and opens the panel to show them. Without an argument it shows the current choice. It does not recolor Claude Code itself: for that, pick an aura-themes theme in `/theme` in a terminal. |
+| `/hud` | Opens the agents panel, for example after you closed it. |
 
-The agents panel needs no command: it opens by itself when subagents start working, and its close button hides it until the next batch of agents. Click a subagent's title to open its history.
+The agents panel opens by itself when subagents start working, and its close button hides it until the next batch of agents; `/hud` opens it again at any time. Click a subagent's title to open its history.
 
 ## Install
 

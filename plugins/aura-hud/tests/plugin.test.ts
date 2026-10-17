@@ -210,3 +210,22 @@ test('a row opens the agent history, and back returns to the list', async ($, on
   }
   expect(asked).toContainEqual(expect.objectContaining({ agentId: 'a1' }))
 })
+
+test('/hud opens the agents panel again after it was closed, on the agent list', async ($, on) => {
+  const opened: string[] = []
+  mock.clock(on, { now: 1_000 })
+  on('ui.open', (_engine, e) => {
+    opened.push(e.id)
+    return PLACED
+  })
+  on('agent.spawn', () => ({ agentId: 'a1', model: 'claude-sonnet-5-5' }))
+  on('session.messages', () => ({ value: [{ role: 'user', text: 'Brief', toolUses: [] }] }))
+  await $.agent.spawn({ ...SPAWN, description: 'Fix login', subagentType: 'general-purpose', tool_use_id: 't1' })
+  const ui = await $.ui.mount({ plugin: PLUGIN, surface: 'desktop', component: 'Pane', requestId: PANE, props: PANE_PROPS })
+  await ui.press({ key: 'open-a1' })
+  const answer = await $.command.run({ ...COMMAND, command: 'hud', args: '' })
+  expect(answer.text).toContain('Agents panel')
+  expect(opened.at(-1)).toBe(PANE)
+  expect(JSON.stringify(await ui.drawn())).not.toContain('Brief')
+  await ui.unmount()
+})
