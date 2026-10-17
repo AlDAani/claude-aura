@@ -1,13 +1,16 @@
 import { atom, read, update } from 'claude-code'
 import type { EngineInterface, Register } from 'claude-code'
 
-import type { Crew, Look, LookSetting } from '../types'
+import type { AgentRun, Crew, Look, LookSetting } from '../types'
 
 import { MAX_NOTE, MAX_STEPS, MAX_TASK_TITLE, MAX_TASKS, MAX_TITLE, PHASES, WORKER_TIERS } from './lib/consts'
 import { blank, isNewFlow, label, merge, readProgress, readStep, workerFlow } from './lib/flow'
+import { historyOf } from './lib/history'
+import type { History } from './lib/history'
 import { isLookSetting, lookOfTheme, paletteOf, THEME_OF, THEME_PREFIX } from './lib/palette'
 import { addRun, applyStep, applyStepReport, crewOf, finishRun, isWorkerType, patchRun, sameCrew } from './lib/runs'
 import { S } from './lib/strings'
+import { historyTree } from './views/history'
 import { paneTree } from './views/pane'
 
 const flow = atom({ plugin: 'aura-hud', key: 'flow' } as const, null)
@@ -17,6 +20,8 @@ const panel = atom({ plugin: 'aura-hud', key: 'panel' } as const, {
   isCompact: false,
   isDoneCollapsed: false,
   autoOpenedFor: '',
+  openRun: '',
+  isBriefOpen: false,
 })
 const now = atom({ plugin: 'aura-hud', key: 'now' } as const, 0)
 const look = atom({ plugin: 'aura-hud', key: 'look' } as const, 'claude')
@@ -26,7 +31,11 @@ const TOOL = 'mcp__aura-hud__progress'
 const STEP_TOOL = 'mcp__aura-hud__step'
 const PANE = 'aura-agents'
 const LOOK_KEY = 'look'
+const HISTORY_ITEMS = 150
+const HISTORY_CACHE = 24
 const PREVIOUS_THEME_KEY = 'themeBeforeLook'
+
+const histories = new Map<string, { key: string; found: History | string }>()
 
 const quietly = async (work: () => Promise<unknown>): Promise<void> => {
   try {
@@ -44,7 +53,7 @@ async function syncCrew($: EngineInterface): Promise<Crew> {
 
 async function autoOpen($: EngineInterface, key: string): Promise<void> {
   if ((await read($, panel)).autoOpenedFor === key) return
-  await update($, panel, prev => ({ ...prev, autoOpenedFor: key }))
+  await update($, panel, prev => ({ ...prev, autoOpenedFor: key, openRun: '' }))
   void $.ui.open({ id: PANE, title: S.pane }).catch(() => undefined)
 }
 
@@ -56,6 +65,17 @@ async function setTotal($: EngineInterface, usd: number | undefined): Promise<vo
 
 async function syncTotal($: EngineInterface): Promise<void> {
   await setTotal($, (await $.session.usage()).cost?.usd)
+}
+
+async function historyFor($: EngineInterface, run: AgentRun, agentId: string): Promise<History | string> {
+  const key = [run.steps, run.status, run.round, run.stepDone ?? ''].join('|')
+  const hit = histories.get(run.id)
+  if (hit?.key === key) return hit.found
+  const read = await $.session.messages({ agentId })
+  const found = 'deny' in read ? read.deny : historyOf(read, HISTORY_ITEMS)
+  if (histories.size >= HISTORY_CACHE) histories.clear()
+  histories.set(run.id, { key, found })
+  return found
 }
 
 async function tick($: EngineInterface): Promise<void> {
@@ -274,16 +294,40 @@ export const register: Register = on => {
   })
 
   on('ui.render', { component: 'Pane', requestId: PANE }, async ($, e) => {
+    const ui = $.ui.resolve(e)
     const list = await read($, agents)
+    const p = await read($, panel)
+    const lookId = await read($, look)
     const at = Math.max(await read($, now), ...list.map(a => a.startedAt), 0)
+    const opened = p.openRun ? list.find(a => a.id === p.openRun) : undefined
+    if (opened?.agentId) {
+      const found = await historyFor($, opened, opened.agentId).catch(() => '')
+      return historyTree(
+        ui,
+        {
+          surface: e.surface,
+          run: opened,
+          history: typeof found === 'string' ? null : found,
+          deny: typeof found === 'string' ? found : '',
+          isBriefOpen: Boolean(p.isBriefOpen),
+          look: lookId,
+          at,
+          bodyColumns: e.props.bodyColumns,
+        },
+        {
+          back: () => update($, panel, prev => ({ ...prev, openRun: '' })),
+          toggleBrief: () => update($, panel, prev => ({ ...prev, isBriefOpen: !prev.isBriefOpen })),
+        },
+      )
+    }
     return paneTree(
-      $.ui.resolve(e),
+      ui,
       {
         surface: e.surface,
         list,
         flow: await read($, flow),
-        panel: await read($, panel),
-        look: await read($, look),
+        panel: p,
+        look: lookId,
         total: await read($, total),
         at,
         bodyColumns: e.props.bodyColumns,
@@ -291,6 +335,7 @@ export const register: Register = on => {
       {
         toggleCompact: () => update($, panel, prev => ({ ...prev, isCompact: !prev.isCompact })),
         toggleDone: () => update($, panel, prev => ({ ...prev, isDoneCollapsed: !prev.isDoneCollapsed })),
+        openRun: id => update($, panel, prev => ({ ...prev, openRun: id, isBriefOpen: false })),
       },
     )
   })

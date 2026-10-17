@@ -3,7 +3,19 @@ import type { Elements, RenderSurface } from 'claude-code'
 import type { AgentRun, AgentStatus, Flow, Look, Panel } from '../../types'
 
 import { MAX_FINISHED_ROWS } from '../lib/consts'
-import { agentSvg, compactSvg, COMPACT_H, headerHeight, headerSvg, PLANNED_H, plannedSvg, ROW_H, TIER_MODEL } from '../lib/draw-pane'
+import {
+  agentSvg,
+  compactSvg,
+  COMPACT_H,
+  headerHeight,
+  headerSvg,
+  OPEN_W,
+  paneWidth,
+  PLANNED_H,
+  plannedSvg,
+  ROW_H,
+  TIER_MODEL,
+} from '../lib/draw-pane'
 import { fmtCost, fmtTime, fmtTokens, fmtUsd, textBar } from '../lib/format'
 import { modelName } from '../lib/model'
 import { paletteOf, tierHex } from '../lib/palette'
@@ -12,12 +24,12 @@ import { plural, S } from '../lib/strings'
 
 const STATUS_GLYPH: Readonly<Record<AgentStatus, string>> = { running: '●', done: '✓', failed: '✗' }
 
-const stateWord = (status: AgentStatus): string =>
+export const stateWord = (status: AgentStatus): string =>
   status === 'running' ? S.isRunning : status === 'failed' ? S.isFailed : S.isFinished
 
-const modelLine = (a: AgentRun): string => (a.effort ? `${modelName(a.model)} · ${a.effort}` : modelName(a.model))
+export const modelLine = (a: AgentRun): string => (a.effort ? `${modelName(a.model)} · ${a.effort}` : modelName(a.model))
 
-const rowAlt = (a: AgentRun, at: number): string => {
+export const rowAlt = (a: AgentRun, at: number): string => {
   const tier = tierOf(a.type)
   const parts = [`${a.description || a.type}: ${tier === 'other' ? a.type : tier}`, modelLine(a), stateWord(a.status)]
   if (showsSteps(a)) parts.push(`step ${a.stepDone ?? 0} of ${a.stepTotal}${a.stepNote ? `, ${a.stepNote}` : ''}`)
@@ -36,7 +48,7 @@ export type PaneView = {
   bodyColumns: number
 }
 
-export type PaneActions = { toggleCompact: () => unknown; toggleDone: () => unknown }
+export type PaneActions = { toggleCompact: () => unknown; toggleDone: () => unknown; openRun: (id: string) => unknown }
 
 export const paneTree = (ui: Elements[RenderSurface], v: PaneView, act: PaneActions) => {
   const { Box, Text, Button } = ui
@@ -73,6 +85,12 @@ export const paneTree = (ui: Elements[RenderSurface], v: PaneView, act: PaneActi
       onPress={act.toggleDone}
     />
   )
+  const openButton = (a: AgentRun) =>
+    a.agentId ? (
+      <Button key={`open-${a.id}`} label={`${S.openHistory} ${a.description || a.type}`} plain onPress={() => act.openRun(a.id)}>
+        ›
+      </Button>
+    ) : null
   const earlier = hidden > 0 && !p.isDoneCollapsed && (
     <Text key="earlier" dimColor>
       +{hidden} {S.earlier}
@@ -81,7 +99,13 @@ export const paneTree = (ui: Elements[RenderSurface], v: PaneView, act: PaneActi
 
   if (v.surface === 'desktop' && 'Svg' in ui) {
     const { Svg } = ui
-    const W = Math.max(240, Math.min(900, (v.bodyColumns || 40) * 8 - 8))
+    const W = paneWidth(v.bodyColumns)
+    const runRow = (a: AgentRun) => (
+      <Box key={a.id} flexDirection="row" alignItems="center">
+        <Svg source={agentSvg(W - OPEN_W, a, at, lookId)} alt={rowAlt(a, at)} width={W - OPEN_W} height={ROW_H} />
+        {openButton(a)}
+      </Box>
+    )
     const section = (key: string, text: string) => (
       <Text key={key} dimColor>
         {text}
@@ -112,14 +136,9 @@ export const paneTree = (ui: Elements[RenderSurface], v: PaneView, act: PaneActi
         {toggleCompact}
         {isEmpty && <Text dimColor>{S.empty}</Text>}
         {running.length > 0 && section('h-run', `${S.running} · ${running.length}`)}
-        {running.map(a => (
-          <Svg key={a.id} source={agentSvg(W, a, at, lookId)} alt={rowAlt(a, at)} width={W} height={ROW_H} />
-        ))}
+        {running.map(runRow)}
         {finishedAll.length > 0 && toggleDone}
-        {!p.isDoneCollapsed &&
-          finished.map(a => (
-            <Svg key={a.id} source={agentSvg(W, a, at, lookId)} alt={rowAlt(a, at)} width={W} height={ROW_H} />
-          ))}
+        {!p.isDoneCollapsed && finished.map(runRow)}
         {earlier}
         {planned.length > 0 && section('h-plan', `${S.planned} · ${planned.length}`)}
         {planned.map(pl => (
@@ -152,6 +171,7 @@ export const paneTree = (ui: Elements[RenderSurface], v: PaneView, act: PaneActi
             {a.description || a.type}
           </Text>
           <Text color={a.status === 'failed' ? 'error' : a.status === 'done' ? 'success' : color}>{STATUS_GLYPH[a.status]}</Text>
+          {openButton(a)}
         </Box>
         <Text dimColor wrap="truncate-end">
           {'  '}

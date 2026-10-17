@@ -1,10 +1,13 @@
 import { describe, expect, test } from 'claude-code/testing'
 
+import type { SessionMessage } from 'claude-code'
+
 import type { AgentRun } from '../types'
 
 import { agentSvg, compactSvg, headerHeight, headerSvg } from '../hooks/lib/draw-pane'
 import { blank, label, merge, readProgress, readStep } from '../hooks/lib/flow'
 import { fitText, textWidth } from '../hooks/lib/format'
+import { historyOf, toolName } from '../hooks/lib/history'
 import { ratesOf, windowOf } from '../hooks/lib/model'
 import { lookOfTheme, paletteCss, paletteOf } from '../hooks/lib/palette'
 import { costumeOf, crewOf, tierOf } from '../hooks/lib/runs'
@@ -180,6 +183,46 @@ describe('drawing', () => {
     const cut = fitText('a'.repeat(200), 13, 120)
     expect(cut.endsWith('…')).toBe(true)
     expect(textWidth(cut, 13)).toBeLessThanOrEqual(120)
+  })
+})
+
+describe('agent history', () => {
+  const messages: SessionMessage[] = [
+    { role: 'user', text: 'Fix the login form\nKeep the API as is.', toolUses: [] },
+    {
+      role: 'assistant',
+      text: 'Looking at the form first.',
+      toolUses: [
+        { tool_use_id: 'u1', tool: 'Read', input: { file_path: '/repo/src/app/login/form.tsx' }, text: 'export const Form = …' },
+        { tool_use_id: 'u2', tool: 'Bash', input: { command: 'npm test\n--watch=false' }, text: 'FAIL login\nstack', isError: true },
+      ],
+    },
+    { role: 'user', text: '', toolUses: [], toolResults: [{ tool_use_id: 'u1', text: 'x', isError: false }] },
+    { role: 'assistant', text: '', toolUses: [{ tool_use_id: 'u3', tool: 'mcp__aura-hud__step', input: { done: 2, total: 5, note: 'Fix tests' } }] },
+    { role: 'user', text: 'Also check the docs.', toolUses: [] },
+    { role: 'assistant', text: 'Done: the form validates again.', toolUses: [] },
+  ]
+
+  test('the brief, the replies and each tool call read in order', () => {
+    const h = historyOf(messages, 100)
+    expect(h.brief).toBe('Fix the login form\nKeep the API as is.')
+    expect(h.items.map(it => it.kind)).toEqual(['say', 'tool', 'tool', 'tool', 'ask', 'say'])
+    expect(h.items[1]).toEqual({ kind: 'tool', tool: 'Read', what: '…/app/login/form.tsx', state: 'ok', error: '' })
+    expect(h.items[2]).toEqual({ kind: 'tool', tool: 'Bash', what: 'npm test', state: 'error', error: 'FAIL login' })
+    expect(h.items[3]).toEqual({ kind: 'tool', tool: 'Step', what: '2/5  Fix tests', state: 'running', error: '' })
+    expect(h.tools).toBe(3)
+    expect(h.hidden).toBe(0)
+  })
+
+  test('a long history keeps its newest entries', () => {
+    const h = historyOf(messages, 2)
+    expect(h.hidden).toBe(4)
+    expect(h.items.map(it => it.kind)).toEqual(['ask', 'say'])
+  })
+
+  test('MCP tools read as tool and server', () => {
+    expect(toolName('mcp__Claude_Browser__navigate')).toBe('navigate · Claude_Browser')
+    expect(toolName('Grep')).toBe('Grep')
   })
 })
 

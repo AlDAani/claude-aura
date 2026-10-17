@@ -12,6 +12,9 @@ import { S } from './strings'
 const TEXT_CSS = "text{font-family:-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',sans-serif;font-variant-numeric:tabular-nums}"
 
 export const ROW_H = 66
+export const OPEN_W = 26
+
+export const paneWidth = (bodyColumns: number): number => Math.max(240, Math.min(900, (bodyColumns || 40) * 8 - 8))
 export const PLANNED_H = 46
 export const COMPACT_H = 32
 

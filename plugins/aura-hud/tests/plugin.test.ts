@@ -167,3 +167,38 @@ test('the panel shows the whole session total and follows it', async ($, on) => 
   await $.session.measure({ context: { window: 1_000_000 }, rateLimits: [], cost: { usd: 251.1 }, changed: ['cost'] })
   for (const surface of SURFACES) expect(await drawn(surface)).toContain('$251.10')
 })
+
+test('a row opens the agent history, and back returns to the list', async ($, on) => {
+  const asked: unknown[] = []
+  mock.clock(on, { now: 1_000 })
+  on('ui.open', () => PLACED)
+  on('agent.spawn', () => ({ agentId: 'a1', model: 'claude-sonnet-5-5' }))
+  on('session.messages', (_engine, e) => {
+    asked.push(e)
+    return {
+      value: [
+        { role: 'user', text: 'Fix the login form', toolUses: [] },
+        {
+          role: 'assistant',
+          text: 'Checking the form.',
+          toolUses: [{ tool_use_id: 'u1', tool: 'Read', input: { file_path: '/repo/src/login.tsx' }, text: 'x' }],
+        },
+      ],
+    }
+  })
+  await $.agent.spawn({ ...SPAWN, description: 'Fix login', subagentType: 'aura-flow:aura-medium', tool_use_id: 't1' })
+  for (const surface of SURFACES) {
+    const ui = await $.ui.mount({ plugin: PLUGIN, surface, component: 'Pane', requestId: PANE, props: PANE_PROPS })
+    await ui.press({ key: 'open-a1' })
+    const opened = JSON.stringify(await ui.drawn())
+    expect(opened).toContain('Checking the form.')
+    expect(opened).toContain('/repo/src/login.tsx')
+    expect(opened).toContain('Fix the login form')
+    await ui.press({ key: 'back' })
+    const back = JSON.stringify(await ui.drawn())
+    expect(back).not.toContain('Checking the form.')
+    expect(back).toContain('Fix login')
+    await ui.unmount()
+  }
+  expect(asked).toContainEqual(expect.objectContaining({ agentId: 'a1' }))
+})
