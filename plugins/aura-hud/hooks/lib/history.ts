@@ -4,12 +4,15 @@ import { capText } from './format'
 
 export type ToolState = 'ok' | 'error' | 'running'
 
-export type HistoryItem =
-  | { kind: 'say'; text: string }
-  | { kind: 'ask'; text: string }
-  | { kind: 'tool'; tool: string; what: string; state: ToolState; error: string }
+export type ToolItem = { kind: 'tool'; tool: string; what: string; state: ToolState; error: string; count: number }
 
-export type History = { brief: string; items: HistoryItem[]; hidden: number; tools: number }
+type Note = { kind: 'say'; text: string } | { kind: 'ask'; text: string }
+
+type HistoryItem = Note | ToolItem
+
+export type Block = Note | { kind: 'tools'; items: ToolItem[] }
+
+export type History = { brief: string; blocks: Block[]; hidden: number; tools: number }
 
 const STEP_TOOL = 'mcp__aura-hud__step'
 const MAX_LINE = 200
@@ -64,6 +67,17 @@ export const toolWhat = (tool: string, input: Readonly<Record<string, unknown>>)
   }
 }
 
+const blocksOf = (items: readonly HistoryItem[]): Block[] => {
+  const blocks: Block[] = []
+  for (const it of items) {
+    const last = blocks.at(-1)
+    if (it.kind !== 'tool') blocks.push(it)
+    else if (last?.kind === 'tools') last.items.push(it)
+    else blocks.push({ kind: 'tools', items: [it] })
+  }
+  return blocks
+}
+
 export const historyOf = (messages: readonly SessionMessage[], max: number): History => {
   const items: HistoryItem[] = []
   let brief = ''
@@ -79,15 +93,16 @@ export const historyOf = (messages: readonly SessionMessage[], max: number): His
     for (const use of m.toolUses) {
       tools += 1
       const state: ToolState = use.isError ? 'error' : use.text === undefined ? 'running' : 'ok'
-      items.push({
-        kind: 'tool',
-        tool: toolName(use.tool),
-        what: capText(toolWhat(use.tool, use.input), MAX_LINE),
-        state,
-        error: state === 'error' ? capText(firstLine(use.text ?? ''), MAX_LINE) : '',
-      })
+      const tool = toolName(use.tool)
+      const what = capText(toolWhat(use.tool, use.input), MAX_LINE)
+      const last = items.at(-1)
+      if (last?.kind === 'tool' && last.state === 'ok' && state === 'ok' && last.tool === tool && last.what === what) {
+        items[items.length - 1] = { ...last, count: last.count + 1 }
+        continue
+      }
+      items.push({ kind: 'tool', tool, what, state, error: state === 'error' ? capText(firstLine(use.text ?? ''), MAX_LINE) : '', count: 1 })
     }
   })
   const hidden = Math.max(0, items.length - max)
-  return { brief, items: hidden ? items.slice(hidden) : items, hidden, tools }
+  return { brief, blocks: blocksOf(hidden ? items.slice(hidden) : items), hidden, tools }
 }

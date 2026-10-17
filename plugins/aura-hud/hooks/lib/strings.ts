@@ -22,7 +22,6 @@ export const S = {
   followUp: 'Follow-up message',
   noHistory: 'History is not available',
   nothingYet: 'Nothing yet.',
-  openHistory: 'Open the history of',
   isRunning: 'running',
   isFinished: 'finished',
   isFailed: 'failed',

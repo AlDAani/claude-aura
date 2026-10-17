@@ -23,7 +23,7 @@ const VALUE_SIZE = 15
 const TILE_H = 40
 const TILE_GAP = 6
 const TWO_ROWS_BELOW = 360
-const LIVE = '.live{animation:p 1.6s ease-in-out infinite}@keyframes p{50%{opacity:.3}}@media (prefers-reduced-motion: reduce){.live{animation:none}}'
+export const LIVE = '.live{animation:p 1.6s ease-in-out infinite}@keyframes p{50%{opacity:.3}}@media (prefers-reduced-motion: reduce){.live{animation:none}}'
 const SEP = '\u0001'
 const CACHE_LIMIT = 400
 const HEADER_INK: readonly InkClass[] = ['t', 's', 'tile']
@@ -48,7 +48,7 @@ const remember = (key: string, value: string): string => {
   return value
 }
 
-const svg = (W: number, H: number, css: string, body: string): string =>
+export const svg = (W: number, H: number, css: string, body: string): string =>
   `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}"><style>${TEXT_CSS}${css}</style>${body}</svg>`
 
 const statusMark = (x: number, y: number, status: AgentStatus | 'planned', tier: Tier): string => {

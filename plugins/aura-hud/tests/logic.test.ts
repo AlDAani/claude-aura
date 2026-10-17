@@ -7,7 +7,9 @@ import type { AgentRun } from '../types'
 import { agentSvg, compactSvg, headerHeight, headerSvg } from '../hooks/lib/draw-pane'
 import { blank, label, merge, readProgress, readStep } from '../hooks/lib/flow'
 import { fitText, textWidth } from '../hooks/lib/format'
+import { toolsHeight, toolsSvg } from '../hooks/lib/draw-history'
 import { historyOf, toolName } from '../hooks/lib/history'
+import type { ToolItem } from '../hooks/lib/history'
 import { ratesOf, windowOf } from '../hooks/lib/model'
 import { lookOfTheme, paletteCss, paletteOf } from '../hooks/lib/palette'
 import { costumeOf, crewOf, tierOf } from '../hooks/lib/runs'
@@ -206,18 +208,49 @@ describe('agent history', () => {
   test('the brief, the replies and each tool call read in order', () => {
     const h = historyOf(messages, 100)
     expect(h.brief).toBe('Fix the login form\nKeep the API as is.')
-    expect(h.items.map(it => it.kind)).toEqual(['say', 'tool', 'tool', 'tool', 'ask', 'say'])
-    expect(h.items[1]).toEqual({ kind: 'tool', tool: 'Read', what: '…/app/login/form.tsx', state: 'ok', error: '' })
-    expect(h.items[2]).toEqual({ kind: 'tool', tool: 'Bash', what: 'npm test', state: 'error', error: 'FAIL login' })
-    expect(h.items[3]).toEqual({ kind: 'tool', tool: 'Step', what: '2/5  Fix tests', state: 'running', error: '' })
+    expect(h.blocks.map(b => b.kind)).toEqual(['say', 'tools', 'ask', 'say'])
+    const calls = h.blocks[1]
+    expect(calls?.kind === 'tools' ? calls.items : []).toEqual([
+      { kind: 'tool', tool: 'Read', what: '…/app/login/form.tsx', state: 'ok', error: '', count: 1 },
+      { kind: 'tool', tool: 'Bash', what: 'npm test', state: 'error', error: 'FAIL login', count: 1 },
+      { kind: 'tool', tool: 'Step', what: '2/5  Fix tests', state: 'running', error: '', count: 1 },
+    ])
     expect(h.tools).toBe(3)
     expect(h.hidden).toBe(0)
+  })
+
+  test('the same call made again in a row folds into one line', () => {
+    const read = { tool_use_id: 'r', tool: 'Read', input: { file_path: '/repo/a.ts' }, text: 'x' }
+    const h = historyOf([{ role: 'user', text: 'Go', toolUses: [] }, { role: 'assistant', text: '', toolUses: [read, read, read] }], 100)
+    const calls = h.blocks[0]
+    expect(calls?.kind === 'tools' ? calls.items.map(it => it.count) : []).toEqual([3])
+    expect(h.tools).toBe(3)
   })
 
   test('a long history keeps its newest entries', () => {
     const h = historyOf(messages, 2)
     expect(h.hidden).toBe(4)
-    expect(h.items.map(it => it.kind)).toEqual(['ask', 'say'])
+    expect(h.blocks.map(b => b.kind)).toEqual(['ask', 'say'])
+  })
+
+  test('the timeline keeps every line inside the panel', () => {
+    const items: ToolItem[] = [
+      { kind: 'tool', tool: 'Bash', what: 'grep -rn "useCurrentWorkspaceId" web/src --include=*.ts --include=*.tsx | head -10; cat web/src/x.ts', state: 'ok', error: '', count: 1 },
+      { kind: 'tool', tool: 'Read', what: '…/views/backlog/index.tsx', state: 'ok', error: '', count: 2 },
+      { kind: 'tool', tool: 'Bash', what: 'npm test', state: 'error', error: 'FAIL src/login.test.ts > validates the form and shows the error under the field', count: 1 },
+      { kind: 'tool', tool: 'Edit', what: '…/backlog/model/useBacklogHotkeys.ts', state: 'running', error: '', count: 1 },
+    ]
+    const W = 420
+    const svg = toolsSvg(W, items, 'medium', 'claude')
+    expect(svg).toContain(`height="${toolsHeight(items)}"`)
+    expect(toolsHeight(items)).toBe(4 * 24 + 16 + 4)
+    expect(svg).toContain('×2')
+    expect(svg).toContain('class="live tm"')
+    for (const [, x, size, text] of svg.matchAll(/class="s mono" x="([\d.]+)" y="[\d.]+" font-size="([\d.]+)">([^<]+)</g)) {
+      const shown = (text ?? '').replace(/&quot;/g, '"').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&')
+      expect([...shown].length * Number(size) * 0.62).toBeLessThanOrEqual(W - Number(x) - 6 + 0.01)
+    }
+    expect(toolsSvg(W, items, 'medium', 'claude')).toBe(svg)
   })
 
   test('MCP tools read as tool and server', () => {

@@ -44,6 +44,15 @@ export const fitText = (s: string, size: number, maxW: number): string => {
   return s
 }
 
+const MONO_EM = 0.62
+
+export const fitMono = (s: string, size: number, maxW: number): string => {
+  const fits = Math.floor(maxW / (size * MONO_EM))
+  const chars = [...s]
+  if (chars.length <= fits) return s
+  return fits < 2 ? '…' : chars.slice(0, fits - 1).join('') + '…'
+}
+
 export const textBar = (ratio: number, width: number): string => {
   const filled = Math.max(0, Math.min(width, Math.round(width * ratio)))
   return '█'.repeat(filled) + '░'.repeat(width - filled)

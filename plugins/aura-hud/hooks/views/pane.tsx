@@ -23,6 +23,9 @@ import { ctxOf, elapsedOf, plannedOf, progressOf, showsSteps, tierOf, totalsOf }
 import { plural, S } from '../lib/strings'
 
 const STATUS_GLYPH: Readonly<Record<AgentStatus, string>> = { running: '●', done: '✓', failed: '✗' }
+const EXPAND_W = 64
+
+type Head = 'empty' | 'run' | 'done' | 'plan'
 
 export const stateWord = (status: AgentStatus): string =>
   status === 'running' ? S.isRunning : status === 'failed' ? S.isFailed : S.isFinished
@@ -74,6 +77,7 @@ export const paneTree = (ui: Elements[RenderSurface], v: PaneView, act: PaneActi
       key="compact"
       label={p.isCompact ? S.expand : S.collapse}
       plain
+      dimColor
       onPress={act.toggleCompact}
     />
   )
@@ -82,15 +86,12 @@ export const paneTree = (ui: Elements[RenderSurface], v: PaneView, act: PaneActi
       key="done"
       label={`${p.isDoneCollapsed ? '▸' : '▾'} ${S.finished} · ${finishedAll.length}`}
       plain
+      dimColor
       onPress={act.toggleDone}
     />
   )
   const openButton = (a: AgentRun) =>
-    a.agentId ? (
-      <Button key={`open-${a.id}`} label={`${S.openHistory} ${a.description || a.type}`} plain onPress={() => act.openRun(a.id)}>
-        ›
-      </Button>
-    ) : null
+    a.agentId ? <Button key={`open-${a.id}`} label="›" plain dimColor onPress={() => act.openRun(a.id)} /> : null
   const earlier = hidden > 0 && !p.isDoneCollapsed && (
     <Text key="earlier" dimColor>
       +{hidden} {S.earlier}
@@ -106,19 +107,32 @@ export const paneTree = (ui: Elements[RenderSurface], v: PaneView, act: PaneActi
         {openButton(a)}
       </Box>
     )
-    const section = (key: string, text: string) => (
-      <Text key={key} dimColor>
-        {text}
-      </Text>
-    )
+    const firstHead: Head = isEmpty ? 'empty' : running.length ? 'run' : finishedAll.length ? 'done' : 'plan'
+    const headLeft = (key: Head) =>
+      key === 'done' ? (
+        toggleDone
+      ) : (
+        <Text key={`h-${key}`} dimColor>
+          {key === 'empty' ? S.empty : key === 'run' ? `${S.running} · ${running.length}` : `${S.planned} · ${planned.length}`}
+        </Text>
+      )
+    const head = (key: Head) =>
+      key === firstHead ? (
+        <Box key="head" flexDirection="row" justifyContent="space-between" alignItems="center">
+          {headLeft(key)}
+          {toggleCompact}
+        </Box>
+      ) : (
+        headLeft(key)
+      )
 
     if (p.isCompact) {
       return (
-        <Box flexDirection="column" gap={1}>
+        <Box flexDirection="row" justifyContent="space-between" alignItems="center">
           <Svg
-            source={compactSvg(W, list, planned, t, v.total, lookId)}
+            source={compactSvg(W - EXPAND_W, list, planned, t, v.total, lookId)}
             alt={`${list.length} ${plural(list.length, 'agent', 'agents')}, ${summary}`}
-            width={W}
+            width={W - EXPAND_W}
             height={COMPACT_H}
           />
           {toggleCompact}
@@ -133,14 +147,13 @@ export const paneTree = (ui: Elements[RenderSurface], v: PaneView, act: PaneActi
           width={W}
           height={headerHeight(W, title, v.total)}
         />
-        {toggleCompact}
-        {isEmpty && <Text dimColor>{S.empty}</Text>}
-        {running.length > 0 && section('h-run', `${S.running} · ${running.length}`)}
+        {isEmpty && head('empty')}
+        {running.length > 0 && head('run')}
         {running.map(runRow)}
-        {finishedAll.length > 0 && toggleDone}
+        {finishedAll.length > 0 && head('done')}
         {!p.isDoneCollapsed && finished.map(runRow)}
         {earlier}
-        {planned.length > 0 && section('h-plan', `${S.planned} · ${planned.length}`)}
+        {planned.length > 0 && head('plan')}
         {planned.map(pl => (
           <Svg
             key={`plan-${pl.n}`}
