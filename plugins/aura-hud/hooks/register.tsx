@@ -7,21 +7,29 @@ import { MAX_NOTE, MAX_STEPS, MAX_TASK_TITLE, MAX_TASKS, MAX_TITLE, PHASES, WORK
 import { blank, isNewFlow, label, merge, readProgress, readStep, workerFlow } from './lib/flow'
 import { historyOf } from './lib/history'
 import type { History } from './lib/history'
+import { contextPercentOf } from './lib/model'
+import { toggledSection } from './lib/panel'
 import { isLookSetting, lookOfTheme, paletteOf, THEME_OF, THEME_PREFIX } from './lib/palette'
 import { addRun, applyStep, applyStepReport, crewOf, finishRun, isWorkerType, patchRun, sameCrew } from './lib/runs'
 import { S } from './lib/strings'
+import { noteWorkflow, readWorkflowCall, readWorkflowResult, withOpen, workflowIdOf, workflowNameOf } from './lib/workflows'
+import type { WorkflowNote } from './lib/workflows'
 import { historyTree } from './views/history'
 import { paneTree } from './views/pane'
 
 const flow = atom({ plugin: 'aura-hud', key: 'flow' } as const, null)
 const agents = atom({ plugin: 'aura-hud', key: 'agents' } as const, [])
+const workflows = atom({ plugin: 'aura-hud', key: 'workflows' } as const, [])
 const crew = atom({ plugin: 'aura-hud', key: 'crew' } as const, { running: 0, workers: 0 })
 const panel = atom({ plugin: 'aura-hud', key: 'panel' } as const, {
   isCompact: false,
+  isRunCollapsed: false,
   isDoneCollapsed: false,
+  isPlanCollapsed: false,
   autoOpenedFor: '',
   openRun: '',
   isBriefOpen: false,
+  openGroups: {},
 })
 const look = atom({ plugin: 'aura-hud', key: 'look' } as const, 'claude')
 const total = atom({ plugin: 'aura-hud', key: 'total' } as const, null)
@@ -34,9 +42,12 @@ const LOOK_KEY = 'look'
 const HISTORY_ITEMS = 150
 const HISTORY_CACHE = 24
 const REVEAL_AFTER_MS = 60
+const RECOUNT_AFTER_MS = [400, 2_500] as const
+const RECOUNT_EVERY_MS = 5_000
 const PREVIOUS_THEME_KEY = 'themeBeforeLook'
 
 const histories = new Map<string, { key: string; found: History | string }>()
+const recounted = { at: Number.NEGATIVE_INFINITY }
 
 const quietly = async (work: () => Promise<unknown>): Promise<void> => {
   try {
@@ -70,10 +81,29 @@ async function setContext($: EngineInterface, percent: number | undefined): Prom
   await update($, mainContext, prev => (prev === next ? prev : next))
 }
 
-async function syncTotal($: EngineInterface): Promise<void> {
+async function recountContext($: EngineInterface): Promise<void> {
+  const { context } = await $.session.usage({ breakdown: 'summary' })
+  const next = contextPercentOf(context)
+  await update($, mainContext, prev => (prev === next ? prev : next))
+}
+
+async function recountSoon($: EngineInterface): Promise<void> {
+  for (const ms of RECOUNT_AFTER_MS) $.clock.after(ms, () => void quietly(() => recountContext($)))
+}
+
+async function syncTotal($: EngineInterface, isFresh = false): Promise<void> {
   const usage = await $.session.usage()
   await setTotal($, usage.cost?.usd)
-  await setContext($, usage.context.percent)
+  if (typeof usage.context.percent === 'number') return setContext($, usage.context.percent)
+  const at = await $.clock.now()
+  if (!isFresh && at - recounted.at < RECOUNT_EVERY_MS) return
+  recounted.at = at
+  await recountContext($)
+}
+
+async function joinWorkflow($: EngineInterface, note: WorkflowNote): Promise<string | undefined> {
+  const at = await $.clock.now()
+  return workflowIdOf(await update($, workflows, list => noteWorkflow(list, note, at)), note)
 }
 
 async function historyFor($: EngineInterface, run: AgentRun, agentId: string): Promise<History | string> {
@@ -212,15 +242,35 @@ export const register: Register = on => {
     })
     await $.command.register({ name: 'hud', description: 'Open the agents panel', immediate: true })
     await quietly(() => refreshLook($))
-    await quietly(() => syncTotal($))
+    await quietly(() => syncTotal($, true))
     return started
   })
 
   on('session.measure', async ($, e, next) => {
     const measured = await next(e)
     await quietly(() => setTotal($, e.cost?.usd))
-    await quietly(() => setContext($, e.context.percent))
+    await quietly(() => (typeof e.context.percent === 'number' ? setContext($, e.context.percent) : recountContext($)))
     return measured
+  })
+
+  on('session.compact', async ($, e, next) => {
+    const compacted = await next(e)
+    if (!e.agentId && e.trigger !== 'precompute' && compacted.skip === undefined) await quietly(() => recountSoon($))
+    return compacted
+  })
+
+  on('session.end', async ($, e, next) => {
+    const ended = await next(e)
+    if (e.reason === 'clear') await quietly(() => recountSoon($))
+    return ended
+  })
+
+  on('tool.call', { tool: 'Workflow' }, async ($, e, next) => {
+    const call = readWorkflowCall(e)
+    await quietly(() => joinWorkflow($, call))
+    const answer = await next(e)
+    await quietly(() => joinWorkflow($, readWorkflowResult(answer, call.callId)))
+    return answer
   })
 
   on('command.run', { command: 'look' }, async ($, e) => ({ text: await setLook($, e.args) }))
@@ -262,7 +312,8 @@ export const register: Register = on => {
     await quietly(async () => {
       const at = await $.clock.now()
       const wasIdle = (await read($, crew)).running === 0
-      await update($, agents, list => addRun(list, e, started, at))
+      const group = e.workflow ? await joinWorkflow($, { runId: e.workflow.runId, callId: e.tool_use_id, name: '' }) : undefined
+      await update($, agents, list => addRun(list, e, started, at, group))
       if (isWorkerType(e.subagentType)) await update($, flow, workerFlow)
       await syncCrew($)
       if (wasIdle) await autoOpen($, `agents-${at}`)
@@ -306,6 +357,7 @@ export const register: Register = on => {
   on('ui.render', { component: 'Pane', requestId: PANE }, async ($, e) => {
     const ui = $.ui.resolve(e)
     const list = await read($, agents)
+    const records = await read($, workflows)
     const p = await read($, panel)
     const lookId = await read($, look)
     const at = await $.clock.now()
@@ -317,6 +369,7 @@ export const register: Register = on => {
         {
           surface: e.surface,
           run: opened,
+          workflow: workflowNameOf(records, opened.workflow),
           history: typeof found === 'string' ? null : found,
           deny: typeof found === 'string' ? found : '',
           isBriefOpen: Boolean(p.isBriefOpen),
@@ -337,6 +390,7 @@ export const register: Register = on => {
       {
         surface: e.surface,
         list,
+        workflows: records,
         flow: await read($, flow),
         panel: p,
         look: lookId,
@@ -347,7 +401,8 @@ export const register: Register = on => {
       },
       {
         toggleCompact: () => update($, panel, prev => ({ ...prev, isCompact: !prev.isCompact })),
-        toggleDone: () => update($, panel, prev => ({ ...prev, isDoneCollapsed: !prev.isDoneCollapsed })),
+        toggleSection: key => update($, panel, prev => toggledSection(prev, key)),
+        toggleGroup: (id, isOpen) => update($, panel, prev => ({ ...prev, openGroups: withOpen(prev.openGroups, id, !isOpen) })),
         openRun: id => {
           void update($, panel, prev => ({ ...prev, openRun: id, isBriefOpen: false })).then(() => quietly(() => reveal($, 'end', 'end')))
         },

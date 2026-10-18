@@ -43,6 +43,16 @@ export type AgentRun = {
   stepDone?: number
   stepTotal?: number
   stepNote?: string
+  workflow?: string
+}
+
+export type WorkflowRun = {
+  id: string
+  runId: string
+  callId: string
+  name: string
+  tone: number
+  startedAt: number
 }
 
 export type Crew = {
@@ -52,10 +62,13 @@ export type Crew = {
 
 export type Panel = {
   isCompact: boolean
+  isRunCollapsed?: boolean
   isDoneCollapsed: boolean
+  isPlanCollapsed?: boolean
   autoOpenedFor: string
   openRun: string
   isBriefOpen: boolean
+  openGroups?: Record<string, boolean>
 }
 
 declare module 'claude-code' {
@@ -63,6 +76,7 @@ declare module 'claude-code' {
     'aura-hud': {
       flow: Flow | null
       agents: AgentRun[]
+      workflows: WorkflowRun[]
       crew: Crew
       panel: Panel
       look: Look

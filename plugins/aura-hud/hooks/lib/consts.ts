@@ -13,3 +13,6 @@ export const MAX_NOTE = 80
 export const MAX_STEPS = 50
 export const MAX_RUNS = 200
 export const MAX_FINISHED_ROWS = 40
+export const MAX_WORKFLOWS = 40
+export const MAX_OPEN_GROUPS = 60
+export const WORKFLOW_AGENT = 'workflow-subagent'

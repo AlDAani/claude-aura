@@ -5,16 +5,32 @@ import type { SessionMessage } from 'claude-code'
 import type { AgentRun } from '../types'
 
 import { importedCostumes } from '../hooks/lib/generated-costumes'
-import { bodyHeightOf, compactSvg, DONE_H, headerHeight, headerSvg, paneWidth, plannedSvg, ROW_H, rowCrabSvg, rowDetailsSvg, rowHeightOf } from '../hooks/lib/draw-pane'
+import {
+  bodyHeightOf,
+  compactSvg,
+  DONE_H,
+  groupBodySvg,
+  headerHeight,
+  headerSvg,
+  paneWidth,
+  plannedSvg,
+  railOf,
+  ROW_H,
+  rowCrabSvg,
+  rowDetailsSvg,
+  rowHeightOf,
+} from '../hooks/lib/draw-pane'
 import { blank, label, merge, readProgress, readStep } from '../hooks/lib/flow'
 import { fitText, textWidth } from '../hooks/lib/format'
 import { toolsHeight, toolsSvg } from '../hooks/lib/draw-history'
 import { historyOf, toolName } from '../hooks/lib/history'
 import type { ToolItem } from '../hooks/lib/history'
-import { ratesOf, windowOf } from '../hooks/lib/model'
+import { contextPercentOf, ratesOf, windowOf } from '../hooks/lib/model'
 import { lookOfTheme, paletteCss, paletteOf } from '../hooks/lib/palette'
 import { addRun, costumeOf, crewOf, newCostumeOf, tierOf } from '../hooks/lib/runs'
 import { plural } from '../hooks/lib/strings'
+import { groupsOf, isGroupOpen, noteWorkflow, readWorkflowCall, readWorkflowResult, sectionsOf, withOpen, workflowIdOf } from '../hooks/lib/workflows'
+import type { Item } from '../hooks/lib/workflows'
 
 const run = (over: Partial<AgentRun>): AgentRun => ({
   id: 'a1',
@@ -244,6 +260,17 @@ describe('drawing', () => {
     expect(crabs(strip)).toBeLessThan(crabs(compactSvg(600, runs, [], totals, null, null, 'claude', 9_000)))
   })
 
+  test('the compact strip drops the least needed totals before its crabs run into them', () => {
+    const totals = { cost: 17.74, tokens: 4_400_000 }
+    const runs = Array.from({ length: 11 }, (_, i) => run({ id: `r${i}`, agentId: `r${i}` }))
+    const crabs = (svg: string): number => (svg.match(/transform="translate\(/g) ?? []).length
+    const narrow = compactSvg(300, runs, [], totals, 17.07, 22, 'claude', 0)
+    expect(narrow).not.toContain('4.4M')
+    expect(narrow).toContain('main ctx 22%')
+    expect(crabs(narrow)).toBeGreaterThanOrEqual(2)
+    expect(compactSvg(600, runs, [], totals, 17.07, 22, 'claude', 0)).toContain('≈$17.74 · 4.4M · session $17.07 · main ctx 22%')
+  })
+
   test('a bar shows real progress only', () => {
     const stepped = rowDetailsSvg(558, run({ stepDone: 2, stepTotal: 5 }), 9_000, 'claude')
     expect(stepped).toContain('class="tc" x="0" y="33" width="')
@@ -461,5 +488,113 @@ describe('palettes', () => {
     expect(lookOfTheme('custom:aura-themes:webstorm-islands-dark')).toBe('webstorm')
     expect(lookOfTheme('dark')).toBe('claude')
     expect(lookOfTheme(undefined)).toBe('claude')
+  })
+})
+
+const only = <T>(v: T | undefined): T => {
+  if (v === undefined) throw new Error('missing')
+  return v
+}
+
+const keysOf = (items: readonly Item[]): string[] => items.map(it => (it.kind === 'group' ? it.group.id : it.run.id))
+
+describe('workflows', () => {
+  test('a Workflow call names its run from the script, a saved name or the script file', () => {
+    const script = "export const meta = {\n  name: 'review-changes',\n  description: 'Review the diff',\n}\nawait agent('x')"
+    expect(readWorkflowCall({ tool_use_id: 'c1', script })).toEqual({ runId: '', callId: 'c1', name: 'review-changes' })
+    expect(readWorkflowCall({ tool_use_id: 'c2', name: 'deploy-check' }).name).toBe('deploy-check')
+    expect(readWorkflowCall({ tool_use_id: 'c3', scriptPath: '/s/workflows/fix-flaky.js', resumeFromRunId: 'wf_9' })).toEqual({
+      runId: 'wf_9',
+      callId: 'c3',
+      name: 'fix-flaky',
+    })
+    expect(readWorkflowResult({ result: { runId: 'wf_1', workflowName: 'review-changes' } }, 'c1')).toEqual({
+      runId: 'wf_1',
+      callId: 'c1',
+      name: 'review-changes',
+    })
+    expect(readWorkflowResult({ deny: 'no' }, 'c1')).toEqual({ runId: '', callId: 'c1', name: '' })
+  })
+
+  test('a call, its result, its agents and a resume land on one record; each run gets its own tone', () => {
+    let list = noteWorkflow([], { runId: '', callId: 'c1', name: 'review-changes' }, 1)
+    list = noteWorkflow(list, { runId: '', callId: 'c1', name: '' }, 2)
+    list = noteWorkflow(list, { runId: 'wf_1', callId: 'c1', name: 'review-changes' }, 3)
+    list = noteWorkflow(list, { runId: 'wf_1', callId: '', name: '' }, 4)
+    expect(list).toHaveLength(1)
+    expect(list[0]).toMatchObject({ id: 'c1', runId: 'wf_1', name: 'review-changes', startedAt: 1 })
+    const resumed = noteWorkflow(list, { runId: 'wf_1', callId: 'c9', name: '' }, 5)
+    expect(resumed).toHaveLength(1)
+    expect(workflowIdOf(resumed, { runId: '', callId: 'c9', name: '' })).toBe('c1')
+    const two = noteWorkflow(resumed, { runId: 'wf_2', callId: 'c2', name: 'other' }, 6)
+    expect(two[1]?.tone).not.toBe(two[0]?.tone)
+    expect(noteWorkflow(two, { runId: 'wf_2', callId: 'c2', name: 'other' }, 7)).toBe(two)
+    expect(noteWorkflow([], { runId: '', callId: '', name: 'x' }, 1)).toEqual([])
+  })
+
+  test('a running workflow keeps its finished agents with it, and a finished one moves to Finished', () => {
+    const records = noteWorkflow(noteWorkflow([], { runId: 'wf_a', callId: 'ca', name: 'figma-exports' }, 1), { runId: 'wf_b', callId: 'cb', name: 'reconcile' }, 2)
+    const list = [
+      run({ id: 'b1', agentId: 'b1', workflow: 'wf_b', status: 'done', startedAt: 10 }),
+      run({ id: 'a1', agentId: 'a1', workflow: 'wf_a', status: 'done', startedAt: 20 }),
+      run({ id: 's1', agentId: 's1', type: 'Explore', startedAt: 25 }),
+      run({ id: 'a2', agentId: 'a2', workflow: 'wf_a', startedAt: 30 }),
+      run({ id: 'b2', agentId: 'b2', workflow: 'wf_b', status: 'failed', startedAt: 40 }),
+      run({ id: 's2', agentId: 's2', type: 'Explore', status: 'done', startedAt: 50 }),
+    ]
+    const groups = groupsOf(list, records)
+    expect(groups.get('wf_a')).toMatchObject({ name: 'figma-exports', running: 1, done: 1, status: 'running' })
+    expect(groups.get('wf_b')).toMatchObject({ name: 'reconcile', done: 1, failed: 1, status: 'done' })
+    const sections = sectionsOf(list, groups)
+    expect(keysOf(sections.running)).toEqual(['s1', 'wf_a'])
+    expect(keysOf(sections.finished)).toEqual(['s2', 'wf_b'])
+    expect(sections.finishedAgents).toBe(3)
+  })
+
+  test('running workflows start open and finished ones closed, until the person picks', () => {
+    const groups = groupsOf([run({ workflow: 'w1' }), run({ id: 'b', agentId: 'b', workflow: 'w2', status: 'done' })], [])
+    const live = only(groups.get('w1'))
+    const over = only(groups.get('w2'))
+    expect(isGroupOpen(live, undefined)).toBe(true)
+    expect(isGroupOpen(over, {})).toBe(false)
+    expect(isGroupOpen(over, withOpen({}, 'w2', true))).toBe(true)
+    expect(isGroupOpen(live, withOpen({}, 'w1', false))).toBe(false)
+    let open: Record<string, boolean> = {}
+    for (let n = 0; n < 100; n += 1) open = withOpen(open, `w${n}`, true)
+    expect(Object.keys(open)).toHaveLength(60)
+    expect(open.w99).toBe(true)
+  })
+
+  test('rounds count within one workflow only', () => {
+    const spawn = (n: number) => ({ description: 'review:bugs', subagentType: 'workflow-subagent', tool_use_id: `c${n}`, workflow: { agentIndex: 1 } })
+    const first = addRun([], spawn(1), { agentId: 'a1', model: 'claude-opus-5-5' }, 0, 'w1')
+    const other = addRun(first, spawn(2), { agentId: 'a2', model: 'claude-opus-5-5' }, 0, 'w2')
+    const again = addRun(other, spawn(3), { agentId: 'a3', model: 'claude-opus-5-5' }, 0, 'w1')
+    expect(again.map(a => a.round)).toEqual([1, 1, 2])
+    expect(again.map(a => a.workflow)).toEqual(['w1', 'w2', 'w1'])
+  })
+
+  test('a workflow agent drops the generic type, and the header draws one segment per agent', () => {
+    expect(rowDetailsSvg(400, run({ type: 'workflow-subagent', workflow: 'w1' }), 0, 'claude')).not.toContain('workflow-subagent')
+    expect(rowDetailsSvg(400, run({ type: 'workflow-subagent' }), 0, 'claude')).toContain('workflow-subagent')
+    const three = [run({ workflow: 'w1', status: 'done' }), run({ id: 'b', agentId: 'b', workflow: 'w1', status: 'failed' }), run({ id: 'c', agentId: 'c', workflow: 'w1' })]
+    const head = groupBodySvg(340, only(groupsOf(three, []).get('w1')), 0, 'claude')
+    expect(head).toContain('3 agents · 1 running')
+    expect(head).toContain('1 failed')
+    expect(head.match(/<rect class="(go|er|live [a-z]+)"/g)).toHaveLength(3)
+    const crowd = Array.from({ length: 80 }, (_, n) => run({ id: `r${n}`, agentId: `r${n}`, workflow: 'w2', status: n < 60 ? 'done' : 'running' }))
+    expect(groupBodySvg(200, only(groupsOf(crowd, []).get('w2')), 0, 'claude')).toContain('clip-path')
+  })
+
+  test('the rail runs down to the middle of the last agent', () => {
+    expect(railOf([run({ status: 'done' }), run({ id: 'b', agentId: 'b' })])).toEqual({ height: 2 * DONE_H, end: 1.5 * DONE_H - 1.5 })
+    expect(railOf([])).toEqual({ height: 0, end: 0 })
+  })
+
+  test('the main context is the measured fill, else an estimate over the window', () => {
+    expect(contextPercentOf({ window: 1_000_000, percent: 87.6 })).toBe(88)
+    expect(contextPercentOf({ window: 1_000_000, breakdown: { totalTokens: 92_000 } })).toBe(9)
+    expect(contextPercentOf({ window: 1_000_000 })).toBeNull()
+    expect(contextPercentOf({ window: 200_000, breakdown: { totalTokens: 500_000 } })).toBe(100)
   })
 })

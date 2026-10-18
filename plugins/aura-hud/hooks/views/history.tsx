@@ -7,13 +7,14 @@ import { bodyHeightOf, CRAB_W, paneWidth, rowCrabSvg, rowDetailsSvg, rowHeightOf
 import { fitText } from '../lib/format'
 import { firstLine } from '../lib/history'
 import type { Block, History, ToolItem, ToolState } from '../lib/history'
-import { tierOf } from '../lib/runs'
+import { kindOf, tierOf } from '../lib/runs'
 import { plural, S } from '../lib/strings'
 import { modelLine, rowAlt, stateWord, TITLE_SIZE } from './pane'
 
 export type HistoryView = {
   surface: RenderSurface
   run: AgentRun
+  workflow: string
   history: History | null
   deny: string
   isBriefOpen: boolean
@@ -36,6 +37,7 @@ export const historyTree = (ui: Elements[RenderSurface], v: HistoryView, act: Hi
   const a = v.run
   const story = v.history
   const tier = tierOf(a.type)
+  const kind = kindOf(a)
   const W = paneWidth(v.bodyColumns)
   const svgUi = v.surface === 'desktop' && 'Svg' in ui ? ui : null
   const lastSay = story ? lastSayOf(story.blocks) : -1
@@ -107,7 +109,8 @@ export const historyTree = (ui: Elements[RenderSurface], v: HistoryView, act: Hi
         {a.description || a.type}
       </Text>
       <Text dimColor wrap="truncate-end">
-        {tier === 'other' ? a.type : tier} · {modelLine(a)} · {stateWord(a.status)}
+        {kind ? `${kind} · ` : ''}
+        {modelLine(a)} · {stateWord(a.status)}
       </Text>
     </Box>
   )
@@ -115,6 +118,11 @@ export const historyTree = (ui: Elements[RenderSurface], v: HistoryView, act: Hi
   return (
     <Box flexDirection="column">
       {back('back')}
+      {v.workflow ? (
+        <Text dimColor wrap="truncate-end">
+          {S.workflowWord} · {v.workflow}
+        </Text>
+      ) : null}
       {header}
       {story === null ? (
         <Text dimColor>{v.deny ? `${S.noHistory}: ${v.deny}` : S.noHistory}</Text>

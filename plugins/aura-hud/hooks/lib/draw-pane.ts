@@ -6,8 +6,10 @@ import { modelName } from './model'
 import { inkCss, paletteOf, tierClass } from './palette'
 import type { InkClass } from './palette'
 import type { Costume, Planned, Totals } from './runs'
-import { costumeOf, ctxOf, progressOf, showsSteps, tierOf } from './runs'
+import { costumeOf, ctxOf, kindOf, progressOf, showsSteps, tierOf } from './runs'
 import { S } from './strings'
+import { failedPart, groupParts } from './workflows'
+import type { Group } from './workflows'
 
 const TEXT_CSS = "text{font-family:-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',sans-serif;font-variant-numeric:tabular-nums}"
 
@@ -23,6 +25,24 @@ const PULSE_MS = 1600
 export const paneWidth = (bodyColumns: number): number => Math.max(240, Math.min(MAX_PANE_W, (bodyColumns || 40) * 8 - 8))
 export const PLANNED_H = 46
 export const COMPACT_H = 32
+const STRIP_ICON = 36
+const STRIP_TEXT = 12
+const STRIP_GAP = 16
+const TEXT_ROOM = 1.15
+export const GROUP_BODY_H = 34
+export const GROUP_H = 56
+export const RAIL_W = 24
+const RAIL_X = 15
+const BADGE = 24
+const SEGMENT_H = 5
+const SEGMENT_GAP = 2
+const SEGMENT_MAX = 26
+const SEGMENT_MIN = 3
+const RAIL_OPACITY = '.45'
+const FAN_OUT =
+  '<circle cx="10.5" cy="12" r="2.6"/><rect x="12" y="11.2" width="4.4" height="1.6"/>' +
+  '<rect x="15.6" y="6.2" width="1.6" height="11.6"/><rect x="16.4" y="6.2" width="3.6" height="1.6"/>' +
+  '<rect x="16.4" y="16.2" width="3.6" height="1.6"/><circle cx="21.5" cy="7" r="2.6"/><circle cx="21.5" cy="17" r="2.6"/>'
 
 const CRAB_SCALE = 1.1
 const VALUE_SIZE = 15
@@ -37,6 +57,7 @@ const HEADER_INK: readonly InkClass[] = ['t', 's', 'tile', 'er']
 const ROW_INK: readonly InkClass[] = ['t', 's', 'm', 'k', 'ln', 'ok', 'no', 'er']
 const PLANNED_INK: readonly InkClass[] = ['s', 'm', 'ln', 'id']
 const COMPACT_INK: readonly InkClass[] = ['s']
+const GROUP_INK: readonly InkClass[] = ['s', 'k', 'ok', 'no', 'er', 'go']
 
 export const TIER_EFFORT: Readonly<Record<Tier, string>> = {
   fable: 'high',
@@ -104,10 +125,29 @@ export const headerHeight = (W: number, title: string, total: number | null, con
 const valueSize = (value: string, maxW: number): number =>
   Math.floor(Math.max(10, Math.min(VALUE_SIZE, (VALUE_SIZE * maxW) / Math.max(1, textWidth(value, VALUE_SIZE)))) * 2) / 2
 
-export const totalsText = (t: Totals, total: number | null, context: number | null): string =>
-  `≈${fmtUsd(t.cost)} · ${fmtTokens(t.tokens)}` +
-  (total === null ? '' : ` · ${S.sessionWord} ${fmtUsd(total)}`) +
-  (context === null ? '' : ` · ${S.contextWord} ${context}%`)
+const summariesOf = (t: Totals, total: number | null, context: number | null): string[] => {
+  const cost = `≈${fmtUsd(t.cost)}`
+  const session = total === null ? '' : `${S.sessionWord} ${fmtUsd(total)}`
+  const ctx = context === null ? '' : `${S.contextWord} ${context}%`
+  return [[cost, fmtTokens(t.tokens), session, ctx], [cost, session, ctx], [cost, ctx], [cost]].map(parts => parts.filter(Boolean).join(' · '))
+}
+
+const iconsFit = (room: number, count: number): number => {
+  for (let fit = Math.min(count, Math.floor(room / STRIP_ICON)); fit > 0; fit -= 1) {
+    const more = count - fit
+    if (fit * STRIP_ICON + (more ? 4 + textWidth(`+${more}`, STRIP_TEXT) * TEXT_ROOM : 0) <= room) return fit
+  }
+  return 0
+}
+
+export const stripLayout = (W: number, count: number, summaries: readonly string[]): { summary: string; fit: number } => {
+  let layout = { summary: '', fit: 0 }
+  for (const summary of summaries) {
+    layout = { summary, fit: iconsFit(W - textWidth(summary, STRIP_TEXT) * TEXT_ROOM - STRIP_GAP, count) }
+    if (layout.fit >= Math.min(2, count)) return layout
+  }
+  return layout
+}
 
 export const headerSvg = (W: number, title: string, t: Totals, total: number | null, context: number | null, lookId: Look): string => {
   const tiles = tilesOf(t, total, context)
@@ -158,9 +198,10 @@ const detailsOf = (x0: number, y0: number, textW: number, a: AgentRun, at: numbe
       ? ''
       : `<rect class="k" x="${x0}" y="${barY}" width="${textW}" height="4" rx="2"/>` +
         `<rect class="${tc}" x="${x0}" y="${barY}" width="${Math.round(textW * progress)}" height="4" rx="2"/>`
+  const kind = kindOf(a)
+  const lead = kind ? `<tspan class="${tc}">${xml(kind)}</tspan><tspan class="s"> · ` : '<tspan class="s">'
   const svgText =
-    `<text x="${x0}" y="${y0 + 12}" font-size="11"><tspan class="${tc}">${xml(tier === 'other' ? a.type : tier)}</tspan>` +
-    `<tspan class="s"> · ${xml(meta.join(' · '))}</tspan>` +
+    `<text x="${x0}" y="${y0 + 12}" font-size="11">${lead}${xml(meta.join(' · '))}</tspan>` +
     (a.status === 'failed' ? `<tspan class="er"> · ${S.failed}</tspan>` : '') +
     `</text>` +
     (steps && stepsW > 30 ? `<text class="t" x="${x0}" y="${y0 + 27}" font-size="11">${xml(fitText(steps, 11, stepsW))}</text>` : '') +
@@ -172,7 +213,7 @@ const detailsOf = (x0: number, y0: number, textW: number, a: AgentRun, at: numbe
 
 const runKey = (kind: string, W: number, a: AgentRun, lookId: Look): string =>
   [kind, lookId, W, a.id, a.status, a.type, a.description, a.model, a.costume, a.effort, a.round, a.stepDone, a.stepTotal, a.stepNote]
-    .concat([ctxOf(a), fmtCost(a.costUsd), progressOf(a) ?? ''])
+    .concat([ctxOf(a), fmtCost(a.costUsd), progressOf(a) ?? '', kindOf(a)])
     .join(SEP)
 
 export const rowCrabSvg = (a: AgentRun, lookId: Look): string => {
@@ -228,7 +269,6 @@ export const compactSvg = (
   lookId: Look,
   at: number,
 ): string => {
-  const summary = totalsText(t, total, context)
   const runIcon = (a: AgentRun): Icon => {
     const costume = costumeOf(a.type, a.model, a.id, a.costume)
     return { costume, tier: tierOf(a.type), accent: accentOf(a.type, costume), isRunning: a.status === 'running', isDim: false }
@@ -238,22 +278,103 @@ export const compactSvg = (
     ...list.filter(a => a.status !== 'running').map(runIcon),
     ...planned.map(pl => ({ costume: pl.tier, tier: pl.tier, accent: pl.tier, isRunning: false, isDim: true })),
   ]
-  const fit = Math.max(1, Math.floor((W - textWidth(summary, 12) - 24) / 36))
+  const { summary, fit } = stripLayout(W, icons.length, summariesOf(t, total, context))
   const shown = icons.slice(0, fit)
   const more = icons.length - shown.length
   const walking = shown.filter(ic => ic.isRunning)
   const body = shown
     .map(
       (ic, i) =>
-        crab(i * 36, 0, ic.costume, ic.isDim, ic.isRunning, CRAB_SCALE, ic.accent) +
-        (ic.isRunning ? `<circle class="live ${liveClass(ic.tier)}" cx="${i * 36 + 32}" cy="4" r="3"/>` : ''),
+        crab(i * STRIP_ICON, 0, ic.costume, ic.isDim, ic.isRunning, CRAB_SCALE, ic.accent) +
+        (ic.isRunning ? `<circle class="live ${liveClass(ic.tier)}" cx="${i * STRIP_ICON + 32}" cy="4" r="3"/>` : ''),
     )
     .join('')
-  const x = shown.length * 36 + (more ? 4 : 0)
+  const x = shown.length * STRIP_ICON + 4
   const full =
     body +
-    (more ? `<text class="s" x="${x}" y="21" font-size="12">+${more}</text>` : '') +
-    `<text class="s" x="${W}" y="21" text-anchor="end" font-size="12">${xml(summary)}</text>`
+    (more && fit ? `<text class="s" x="${x}" y="21" font-size="${STRIP_TEXT}">+${more}</text>` : '') +
+    `<text class="s" x="${W}" y="21" text-anchor="end" font-size="${STRIP_TEXT}">${xml(summary)}</text>`
   const css = inkCss(paletteOf(lookId), full, COMPACT_INK, ALL_TIERS) + (walking.length ? liveCss(at) + crabCss(walking.map(ic => ic.costume)) : '')
   return svg(W, COMPACT_H, css, full)
+}
+
+const r1 = (n: number): number => Math.round(n * 10) / 10
+
+const segmentClass = (status: AgentStatus, tc: string): string =>
+  status === 'done' ? 'go' : status === 'failed' ? 'er' : `live ${tc}`
+
+const STRIP_ORDER: readonly AgentStatus[] = ['done', 'failed', 'running']
+
+const stripOf = (W: number, y: number, statuses: readonly AgentStatus[], tc: string): string => {
+  const n = statuses.length
+  if (!n || W < 12) return ''
+  const each = Math.min(SEGMENT_MAX, (W - SEGMENT_GAP * (n - 1)) / n)
+  if (each >= SEGMENT_MIN) {
+    const rx = r1(Math.min(SEGMENT_H / 2, each / 2))
+    return statuses
+      .map((s, i) => `<rect class="${segmentClass(s, tc)}" x="${r1(i * (each + SEGMENT_GAP))}" y="${y}" width="${r1(each)}" height="${SEGMENT_H}" rx="${rx}"/>`)
+      .join('')
+  }
+  let x = 0
+  const parts = STRIP_ORDER.map(s => {
+    const w = (W * statuses.filter(t => t === s).length) / n
+    const part = w > 0 ? `<rect class="${segmentClass(s, tc)}" x="${r1(x)}" y="${y}" width="${r1(w)}" height="${SEGMENT_H}"/>` : ''
+    x += w
+    return part
+  }).join('')
+  return (
+    `<clipPath id="strip"><rect x="0" y="${y}" width="${r1(W)}" height="${SEGMENT_H}" rx="${SEGMENT_H / 2}"/></clipPath>` +
+    `<g clip-path="url(#strip)"><rect class="k" x="0" y="${y}" width="${r1(W)}" height="${SEGMENT_H}"/>${parts}</g>`
+  )
+}
+
+export const groupIconSvg = (tone: Tier, hasRail: boolean, lookId: Look): string => {
+  const key = ['group-icon', lookId, tone, hasRail].join(SEP)
+  const hit = cache.get(key)
+  if (hit !== undefined) return hit
+  const tc = tierClass(tone)
+  const body =
+    `<rect class="${tc}" x="4" y="0" width="${BADGE}" height="${BADGE}" rx="7" opacity=".16"/>` +
+    `<g class="${tc}">${FAN_OUT}</g>` +
+    (hasRail ? `<rect class="${tc}" x="${RAIL_X}" y="${BADGE + 5}" width="2" height="${GROUP_H - BADGE - 5}" opacity="${RAIL_OPACITY}"/>` : '')
+  return remember(key, svg(CRAB_W, GROUP_H, inkCss(paletteOf(lookId), body, [], ALL_TIERS), body))
+}
+
+export const groupBodySvg = (W: number, g: Group, at: number, lookId: Look): string => {
+  const statuses = g.runs.map(a => a.status)
+  const cost = `≈${fmtCost(g.cost)}`
+  const key = ['group', lookId, W, g.tone, g.status, cost, statuses.join(',')].join(SEP)
+  const hit = cache.get(key)
+  if (hit !== undefined) return hit
+  const tc = tierClass(g.tone)
+  const textW = W - 22
+  const counts = groupParts(g).join(' · ')
+  const failed = failedPart(g)
+  const full = `${S.workflowWord} · ${counts}${failed ? ` · ${failed}` : ''}`
+  const line =
+    textWidth(full, 11) <= textW
+      ? `<tspan class="${tc}">${S.workflowWord}</tspan><tspan class="s"> · ${xml(counts)}</tspan>` +
+        (failed ? `<tspan class="er"> · ${xml(failed)}</tspan>` : '')
+      : `<tspan class="s">${xml(fitText(full, 11, textW))}</tspan>`
+  const body =
+    `<text x="0" y="12" font-size="11">${line}</text>` +
+    stripOf(Math.max(0, textW - textWidth(cost, 11) - 12), 22, statuses, tc) +
+    `<text class="s" x="${textW}" y="27" text-anchor="end" font-size="11">${xml(cost)}</text>` +
+    statusMark(W - 8, 8, g.status, g.tone)
+  const css = inkCss(paletteOf(lookId), body, GROUP_INK, ALL_TIERS) + (g.status === 'running' ? liveCss(at) : '')
+  return remember(key, svg(W, GROUP_BODY_H, css, body))
+}
+
+export const railOf = (rows: readonly AgentRun[]): { height: number; end: number } => {
+  const height = rows.reduce((h, a) => h + rowHeightOf(a), 0)
+  const last = rows.at(-1)
+  return { height, end: last ? r1(height - rowHeightOf(last) / 2 - 1.5) : 0 }
+}
+
+export const railSvg = (height: number, end: number, tone: Tier, lookId: Look): string => {
+  const key = ['rail', lookId, height, end, tone].join(SEP)
+  const hit = cache.get(key)
+  if (hit !== undefined) return hit
+  const body = `<path class="${tierClass(tone)}" opacity="${RAIL_OPACITY}" d="M${RAIL_X} 0h2v${r1(end - 1)}a1 1 0 0 1-2 0z"/>`
+  return remember(key, svg(RAIL_W, height, inkCss(paletteOf(lookId), body, [], ALL_TIERS), body))
 }

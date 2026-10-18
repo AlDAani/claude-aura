@@ -1,6 +1,6 @@
 import type { AgentRun, AgentStatus, Crew, Flow, PlannedTask, Tier } from '../../types'
 
-import { MAX_RUNS, WORKER_PREFIX, WORKER_TIERS } from './consts'
+import { MAX_RUNS, WORKER_PREFIX, WORKER_TIERS, WORKFLOW_AGENT } from './consts'
 import type { StepInput } from './flow'
 import { norm } from './format'
 import { costOf, sumUsage, windowOf } from './model'
@@ -10,7 +10,7 @@ export type Planned = PlannedTask & { n: number }
 
 export type Totals = { cost: number; tokens: number }
 
-export type SpawnInput = { description: string; subagentType: string; tool_use_id: string }
+export type SpawnInput = { description: string; subagentType: string; tool_use_id: string; workflow?: { agentIndex: number } }
 
 export type SpawnResult = { agentId?: string; model: string }
 
@@ -23,6 +23,12 @@ export const tierOf = (type: string): Tier => {
   if (!bare.startsWith(WORKER_PREFIX)) return 'other'
   const t = bare.slice(WORKER_PREFIX.length).toLowerCase()
   return (WORKER_TIERS as readonly string[]).includes(t) ? (t as Tier) : 'other'
+}
+
+export const kindOf = (a: AgentRun): string => {
+  const tier = tierOf(a.type)
+  if (tier !== 'other') return tier
+  return a.workflow && a.type === WORKFLOW_AGENT ? '' : a.type
 }
 
 export const COSTUMES_BY_MODEL = {
@@ -100,12 +106,13 @@ export const ctxOf = (a: AgentRun): number =>
   a.contextMax ? Math.min(100, Math.round((a.contextTokens / a.contextMax) * 100)) : 0
 
 
-export const addRun = (list: readonly AgentRun[], e: SpawnInput, started: SpawnResult, at: number): AgentRun[] => {
+export const addRun = (list: readonly AgentRun[], e: SpawnInput, started: SpawnResult, at: number, workflow?: string): AgentRun[] => {
   const key = norm(e.description)
-  const round = 1 + (key ? list.filter(a => norm(a.description) === key).length : 0)
+  const round = 1 + (key ? list.filter(a => a.workflow === workflow && norm(a.description) === key).length : 0)
   const run: AgentRun = {
-    id: started.agentId ?? e.tool_use_id,
+    id: started.agentId ?? (e.workflow ? `${e.tool_use_id}:${e.workflow.agentIndex}` : e.tool_use_id),
     agentId: started.agentId,
+    workflow,
     type: e.subagentType,
     description: e.description,
     model: started.model,

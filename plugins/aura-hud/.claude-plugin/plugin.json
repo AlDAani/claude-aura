@@ -1,7 +1,7 @@
 {
   "name": "aura-hud",
-  "version": "1.7.1",
-  "description": "Agents panel for /flow and any subagents, opening when they start: running, finished and planned subagents with model, task progress, context, cost and time. Palettes: Claude, ChatGPT Dark, WebStorm Islands Dark (/look).",
+  "version": "1.8.0",
+  "description": "Agents panel for /flow and any subagents, opening when they start: running, finished and planned subagents, grouped by the workflow that started them, with model, task progress, context and cost. Palettes: Claude, ChatGPT Dark, WebStorm Islands Dark (/look).",
   "author": {
     "name": "AlDAani",
     "url": "https://github.com/AlDAani"

@@ -66,6 +66,15 @@ export const windowOf = (model: string): number => {
   return atLeast(v, 4, 6) ? 1_000_000 : 200_000
 }
 
+export type ContextFill = { percent?: number; window: number; breakdown?: { totalTokens: number } }
+
+export const wholePercent = (n: number): number | null => (Number.isFinite(n) ? Math.max(0, Math.min(100, Math.round(n))) : null)
+
+export const contextPercentOf = (c: ContextFill): number | null => {
+  if (typeof c.percent === 'number') return wholePercent(c.percent)
+  return c.breakdown && c.window > 0 ? wholePercent((c.breakdown.totalTokens / c.window) * 100) : null
+}
+
 export const modelName = (id: string): string => {
   const v = versionOf(id)
   if (!v) return id.replace(/^claude-/, '').replace(/\[.*\]$/, '') || '—'

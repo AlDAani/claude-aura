@@ -5,7 +5,7 @@ Claude Aura: upgrades for [Claude Code](https://claude.com/claude-code) — agen
 | Plugin | Type | What it does |
 | --- | --- | --- |
 | [aura-flow](plugins/aura-flow) | skill + agents | `/flow <task>`: the session model plans, delegates to tiered worker subagents and reviews their work. |
-| [aura-hud](plugins/aura-hud) | mod | A live agents panel, in Claude, ChatGPT Dark or WebStorm Islands Dark colors (`/look`). Made for aura-flow, shows any subagents. |
+| [aura-hud](plugins/aura-hud) | mod | A live agents panel, in Claude, ChatGPT Dark or WebStorm Islands Dark colors (`/look`). Made for aura-flow, shows any subagents, grouped by the workflow that started them. |
 | [aura-themes](plugins/aura-themes) | themes | ChatGPT Dark and WebStorm Islands Dark color themes for Claude Code, picked in `/theme`. |
 
 aura-flow and aura-hud work on their own and light up together: with both installed, the flow shows its plan in the agents panel and workers report their progress there. aura-themes recolors Claude Code itself in a terminal: pick its themes in `/theme`.
@@ -18,7 +18,7 @@ aura-flow and aura-hud work on their own and light up together: with both instal
 | `/look [auto\|claude\|chatgpt\|webstorm]` | Picks the colors of the agents panel and opens the panel to show them. Without an argument it shows the current choice. It does not recolor Claude Code itself: for that, pick an aura-themes theme in `/theme` in a terminal. |
 | `/hud` | Opens the agents panel, for example after you closed it. |
 
-The agents panel opens by itself when subagents start working, and its close button hides it until the next batch of agents; `/hud` opens it again at any time. `/look` and `/hud` run at once, even while Claude is working, and never interrupt it. Click a subagent's title to open its history.
+The agents panel opens by itself when subagents start working, and its close button hides it until the next batch of agents; `/hud` opens it again at any time. `/look` and `/hud` run at once, even while Claude is working, and never interrupt it. Click a subagent's title to open its history. Agents a workflow starts sit under the workflow's name; click the name, or a section header such as Finished, to fold or unfold it. **⊟ Compact** turns the panel into a single line, and **⊞ Expand** brings the list back.
 
 ## Install
 
