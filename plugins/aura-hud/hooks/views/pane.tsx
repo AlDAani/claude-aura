@@ -23,6 +23,8 @@ import {
   rowCrabSvg,
   rowDetailsSvg,
   rowHeightOf,
+  SECTION_H,
+  sectionIconSvg,
   TIER_EFFORT,
 } from '../lib/draw-pane'
 import { fitText, fmtCost, fmtTokens, fmtUsd, textBar } from '../lib/format'
@@ -38,9 +40,13 @@ import type { Group, Item, SectionNote } from '../lib/workflows'
 const STATUS_GLYPH: Readonly<Record<AgentStatus, string>> = { running: '●', done: '✓', failed: '✗' }
 const STRIP_TOGGLE_W = 84
 const VIEW_LABEL = { compact: `⊟ ${S.compact}`, full: `⊞ ${S.expand}` } as const
-const CHEVRON = { desktop: { open: ' ⌄', shut: ' ›' }, text: { open: ' ▾', shut: ' ▸' } } as const
+const OPEN = ' ▾'
+const SHUT = ' ▸'
+const SECTION_GLYPH: Readonly<Record<SectionKey, string>> = { running: '●', finished: '✓', planned: '◷' }
 const STRIP_GLYPHS = 30
 export const TITLE_SIZE = 16
+
+type Chrome = { toggle: RenderChildren; iconOf: (key: SectionKey) => RenderChildren }
 
 export const stateWord = (status: AgentStatus): string =>
   status === 'running' ? S.isRunning : status === 'failed' ? S.isFailed : S.isFinished
@@ -86,7 +92,6 @@ export const paneTree = (ui: Elements[RenderSurface], v: PaneView, act: PaneActi
   const p = v.panel
   const lookId = v.look
   const isDesktop = v.surface === 'desktop' && 'Svg' in ui
-  const chevron = isDesktop ? CHEVRON.desktop : CHEVRON.text
   const running = list.filter(a => a.status === 'running').reverse()
   const finishedRuns = list.filter(a => a.status !== 'running').reverse().slice(0, MAX_FINISHED_ROWS)
   const sections = sectionsOf(list, groupsOf(list, v.workflows))
@@ -104,24 +109,25 @@ export const paneTree = (ui: Elements[RenderSurface], v: PaneView, act: PaneActi
     .join(', ')
 
   const firstKey = isEmpty ? 'empty' : sections.running.length ? 'running' : sections.finished.length ? 'finished' : 'planned'
-  const sectionHead = (key: SectionKey, label: string, count: number, note: SectionNote | null, toggle: RenderChildren) => {
+  const sectionHead = (key: SectionKey, label: string, count: number, note: SectionNote | null, chrome: Chrome) => {
     const isShut = isFolded(p, key)
     const isFirst = key === firstKey
     return (
       <Box key={`h-${key}`} flexDirection="row" justifyContent="space-between" alignItems="center" marginTop={isFirst ? 0 : 'xs'}>
-        <Button key={`section-${key}`} plain hover={{ underline: true }} onPress={() => act.toggleSection(key)}>
-          <Text bold dimColor>
-            {label} · {count}
-          </Text>
-          <Text dimColor>{isShut ? chevron.shut : chevron.open}</Text>
-        </Button>
+        <Box flexDirection="row" alignItems="center" gap={isDesktop ? 0 : 1}>
+          {chrome.iconOf(key)}
+          <Button key={`section-${key}`} plain onPress={() => act.toggleSection(key)}>
+            <Text bold>{label}</Text>
+            <Text dimColor>{` · ${count}${isShut ? SHUT : OPEN}`}</Text>
+          </Button>
+        </Box>
         <Box flexDirection="row" alignItems="center" gap="sm">
           {isShut && note ? (
             <Text dimColor wrap="truncate-end">
               {note.failed ? <Text color="error">{`${note.failed} ${S.isFailed} · `}</Text> : null}≈{fmtCost(note.cost)}
             </Text>
           ) : null}
-          {isFirst ? toggle : null}
+          {isFirst ? chrome.toggle : null}
         </Box>
       </Box>
     )
@@ -129,7 +135,7 @@ export const paneTree = (ui: Elements[RenderSurface], v: PaneView, act: PaneActi
   const titleOf = (a: AgentRun, width: number) => {
     const title = width > 0 ? fitText(a.description || a.type, TITLE_SIZE, width) : a.description || a.type
     return a.agentId ? (
-      <Button key={`open-${a.id}`} plain hover={{ underline: true }} onPress={() => act.openRun(a.id)}>
+      <Button key={`open-${a.id}`} plain onPress={() => act.openRun(a.id)}>
         <Text bold>{title}</Text>
       </Button>
     ) : (
@@ -137,9 +143,9 @@ export const paneTree = (ui: Elements[RenderSurface], v: PaneView, act: PaneActi
     )
   }
   const groupTitle = (g: Group, isOpen: boolean, width: number) => (
-    <Button key={`fold-${g.id}`} plain hover={{ underline: true }} onPress={() => act.toggleGroup(g.id, isOpen)}>
+    <Button key={`fold-${g.id}`} plain onPress={() => act.toggleGroup(g.id, isOpen)}>
       <Text bold>{width > 0 ? fitText(g.name, TITLE_SIZE, width) : g.name}</Text>
-      <Text dimColor>{isOpen ? chevron.open : chevron.shut}</Text>
+      <Text dimColor>{isOpen ? OPEN : SHUT}</Text>
     </Button>
   )
   const earlier = hidden > 0 && !isFolded(p, 'finished') && (
@@ -147,19 +153,19 @@ export const paneTree = (ui: Elements[RenderSurface], v: PaneView, act: PaneActi
       +{hidden} {S.earlier}
     </Text>
   )
-  const body = (itemOf: (it: Item) => RenderChildren, plannedOne: (n: number) => RenderChildren, toggle: RenderChildren): RenderChildren[] => [
+  const body = (itemOf: (it: Item) => RenderChildren, plannedOne: (n: number) => RenderChildren, chrome: Chrome): RenderChildren[] => [
     isEmpty && (
       <Box key="h-empty" flexDirection="row" justifyContent="space-between" alignItems="center">
         <Text dimColor>{S.empty}</Text>
-        {toggle}
+        {chrome.toggle}
       </Box>
     ),
-    sections.running.length > 0 && sectionHead('running', S.running, running.length, noteOf(sections.running), toggle),
+    sections.running.length > 0 && sectionHead('running', S.running, running.length, noteOf(sections.running), chrome),
     ...(isFolded(p, 'running') ? [] : sections.running.map(itemOf)),
-    sections.finished.length > 0 && sectionHead('finished', S.finished, sections.finishedAgents, noteOf(sections.finished), toggle),
+    sections.finished.length > 0 && sectionHead('finished', S.finished, sections.finishedAgents, noteOf(sections.finished), chrome),
     ...(isFolded(p, 'finished') ? [] : finished.map(itemOf)),
     earlier,
-    planned.length > 0 && sectionHead('planned', S.planned, planned.length, null, toggle),
+    planned.length > 0 && sectionHead('planned', S.planned, planned.length, null, chrome),
     ...(isFolded(p, 'planned') ? [] : planned.map((_, n) => plannedOne(n))),
   ]
 
@@ -171,7 +177,6 @@ export const paneTree = (ui: Elements[RenderSurface], v: PaneView, act: PaneActi
         key="compact"
         plain
         dimColor
-        hover={{ underline: true }}
         label={p.isCompact ? VIEW_LABEL.full : VIEW_LABEL.compact}
         onPress={act.toggleCompact}
       />
@@ -253,7 +258,10 @@ export const paneTree = (ui: Elements[RenderSurface], v: PaneView, act: PaneActi
           width={W}
           height={headerHeight(W, title, v.total, v.context)}
         />
-        {body(itemOf, plannedOne, viewToggle)}
+        {body(itemOf, plannedOne, {
+          toggle: viewToggle,
+          iconOf: key => <Svg source={sectionIconSvg(key, lookId)} alt={key} width={CRAB_W} height={SECTION_H} />,
+        })}
       </Box>
     )
   }
@@ -373,7 +381,14 @@ export const paneTree = (ui: Elements[RenderSurface], v: PaneView, act: PaneActi
         </Text>
       ) : (
         <Box flexDirection="column" marginTop={1}>
-          {body(itemText, plannedText, null)}
+          {body(itemText, plannedText, {
+            toggle: null,
+            iconOf: key => (
+              <Text color={key === 'running' ? tierHex(palette, 'heavy') : key === 'finished' ? 'success' : undefined} dimColor={key === 'planned'}>
+                {SECTION_GLYPH[key]}
+              </Text>
+            ),
+          })}
         </Box>
       )}
     </Box>

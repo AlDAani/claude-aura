@@ -1,6 +1,7 @@
 import type { AgentRun, AgentStatus, Look, Tier } from '../../types'
 
 import { crab, crabCss, tierOfCostume } from './crab'
+import type { SectionKey } from './panel'
 import { fitText, fmtCost, fmtTokens, fmtUsd, textWidth, xml } from './format'
 import { modelName } from './model'
 import { inkCss, paletteOf, tierClass } from './palette'
@@ -58,6 +59,17 @@ const ROW_INK: readonly InkClass[] = ['t', 's', 'm', 'k', 'ln', 'ok', 'no', 'er'
 const PLANNED_INK: readonly InkClass[] = ['s', 'm', 'ln', 'id']
 const COMPACT_INK: readonly InkClass[] = ['s']
 const GROUP_INK: readonly InkClass[] = ['s', 'k', 'ok', 'no', 'er', 'go']
+const SECTION_INK: readonly InkClass[] = ['ok', 'id']
+
+export const SECTION_H = 22
+
+const SECTION_ICON: Readonly<Record<SectionKey, string>> = {
+  running: '<circle class="th" cx="16" cy="11" r="7" opacity=".22"/><circle class="th" cx="16" cy="11" r="3.6"/>',
+  finished: '<path class="ok" d="M11.2 11.3l3.3 3.3 6.3-6.8" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>',
+  planned:
+    '<circle class="id" cx="16" cy="11" r="5.6" fill="none" stroke-width="1.5"/>' +
+    '<path class="id" d="M16 8.2v3.1l2 1.3" fill="none" stroke-width="1.5" stroke-linecap="round"/>',
+}
 
 export const TIER_EFFORT: Readonly<Record<Tier, string>> = {
   fable: 'high',
@@ -326,6 +338,14 @@ const stripOf = (W: number, y: number, statuses: readonly AgentStatus[], tc: str
     `<clipPath id="strip"><rect x="0" y="${y}" width="${r1(W)}" height="${SEGMENT_H}" rx="${SEGMENT_H / 2}"/></clipPath>` +
     `<g clip-path="url(#strip)"><rect class="k" x="0" y="${y}" width="${r1(W)}" height="${SEGMENT_H}"/>${parts}</g>`
   )
+}
+
+export const sectionIconSvg = (key: SectionKey, lookId: Look): string => {
+  const cacheKey = ['section', lookId, key].join(SEP)
+  const hit = cache.get(cacheKey)
+  if (hit !== undefined) return hit
+  const body = SECTION_ICON[key]
+  return remember(cacheKey, svg(CRAB_W, SECTION_H, inkCss(paletteOf(lookId), body, SECTION_INK, ALL_TIERS), body))
 }
 
 export const groupIconSvg = (tone: Tier, hasRail: boolean, lookId: Look): string => {

@@ -441,3 +441,20 @@ test('the view switch says what it does and sits at the end of the first row und
   expect((await terminal.find({ key: 'compact' }))?.props.label).toBe('Expand')
   await terminal.unmount()
 })
+
+test('controls highlight on hover without underlines, and section headers carry an icon and a ▾ or ▸', async ($, on) => {
+  mock.clock(on, { now: 1_000 })
+  on('ui.open', () => PLACED)
+  on('agent.spawn', () => ({ agentId: 'a1', model: 'claude-opus-5-5' }))
+  await $.agent.spawn({ ...SPAWN, description: 'Map the code', subagentType: 'Explore', tool_use_id: 't1' })
+  for (const surface of SURFACES) {
+    const ui = await $.ui.mount({ plugin: PLUGIN, surface, component: 'Pane', requestId: PANE, props: PANE_PROPS })
+    expect(JSON.stringify(await ui.drawn())).not.toContain('underline')
+    expect(JSON.stringify(await ui.find({ key: 'h-running' }))).toContain(surface === 'desktop' ? 'class=\\"th\\"' : '●')
+    expect((await ui.find({ key: 'section-running' }))?.text).toContain('Running · 1 ▾')
+    await ui.press({ key: 'section-running' })
+    expect((await ui.find({ key: 'section-running' }))?.text).toContain('Running · 1 ▸')
+    await ui.press({ key: 'section-running' })
+    await ui.unmount()
+  }
+})
