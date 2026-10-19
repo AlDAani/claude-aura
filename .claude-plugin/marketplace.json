@@ -6,25 +6,11 @@
   },
   "plugins": [
     {
-      "name": "aura-flow",
-      "source": "./plugins/aura-flow",
-      "description": "Skill: plan, delegate to tiered worker subagents, review.",
-      "version": "1.0.2",
-      "category": "skill"
-    },
-    {
       "name": "aura-hud",
       "source": "./plugins/aura-hud",
-      "description": "Mod: a live agents panel, in Claude, ChatGPT Dark or WebStorm Islands Dark colors; made for aura-flow, shows any subagents, grouped by workflow.",
-      "version": "1.8.1",
+      "description": "Mod: a live agents panel for any subagents, grouped by the workflow that started them, in Claude, ChatGPT Dark or WebStorm Islands Dark colors.",
+      "version": "1.8.2",
       "category": "mod"
-    },
-    {
-      "name": "aura-themes",
-      "source": "./plugins/aura-themes",
-      "description": "Themes: ChatGPT Dark and WebStorm Islands Dark color themes for Claude Code, picked in /theme.",
-      "version": "1.0.3",
-      "category": "theme"
     }
   ]
 }

@@ -40,11 +40,6 @@ export const S = {
     `Look: ${setting === 'auto' ? `auto (now ${active})` : active}. Choose with /look auto, claude, chatgpt or webstorm.`,
   lookSet: (name: string): string => `Panel palette: ${name}, shown in the agents panel.`,
   lookUnknown: (arg: string): string => `Unknown look "${arg}". Choose auto, claude, chatgpt or webstorm.`,
-  themeSet: (name: string): string => ` Terminal theme: ${name}.`,
-  themeBack: (name: string): string => ` Terminal theme back to ${name}.`,
-  themePick: (name: string): string =>
-    ` To recolor Claude Code itself, pick ${name} in /theme in a terminal session (needs aura-themes); the desktop app keeps its own colors.`,
-  themeKept: (reason: string): string => ` Terminal theme unchanged: ${reason}.`,
 } as const
 
 export const plural = (n: number, one: string, many: string): string => (n === 1 ? one : many)

@@ -9,7 +9,7 @@ import { historyOf } from './lib/history'
 import type { History } from './lib/history'
 import { contextPercentOf } from './lib/model'
 import { toggledSection } from './lib/panel'
-import { isLookSetting, lookOfTheme, paletteOf, THEME_OF, THEME_PREFIX } from './lib/palette'
+import { isLookSetting, lookOfTheme, paletteOf } from './lib/palette'
 import { addRun, applyStep, applyStepReport, crewOf, finishRun, isWorkerType, patchRun, sameCrew } from './lib/runs'
 import { S } from './lib/strings'
 import { noteWorkflow, readWorkflowCall, readWorkflowResult, withOpen, workflowIdOf, workflowNameOf } from './lib/workflows'
@@ -44,7 +44,6 @@ const HISTORY_CACHE = 24
 const REVEAL_AFTER_MS = 60
 const RECOUNT_AFTER_MS = [400, 2_500] as const
 const RECOUNT_EVERY_MS = 5_000
-const PREVIOUS_THEME_KEY = 'themeBeforeLook'
 
 const histories = new Map<string, { key: string; found: History | string }>()
 const recounted = { at: Number.NEGATIVE_INFINITY }
@@ -146,37 +145,14 @@ async function refreshLook($: EngineInterface): Promise<Look> {
   return id
 }
 
-async function syncTheme($: EngineInterface, setting: LookSetting): Promise<string> {
-  const row = await themeRow($)
-  if (!row) return ''
-  const current = typeof row.value === 'string' ? row.value : ''
-  const isOurs = current.startsWith(THEME_PREFIX)
-  if (setting === 'chatgpt' || setting === 'webstorm') {
-    const target = THEME_OF[setting]
-    if (current === target) return ''
-    if (!row.options?.includes(target)) return S.themePick(paletteOf(setting).name)
-    if (!isOurs) await $.store.set(PREVIOUS_THEME_KEY, current)
-    const { deny } = await $.config.set({ key: 'theme', value: target })
-    return deny ? S.themeKept(deny) : S.themeSet(paletteOf(setting).name)
-  }
-  if (setting === 'claude' && isOurs) {
-    const previous = await $.store.get(PREVIOUS_THEME_KEY)
-    const back = typeof previous === 'string' && previous && !previous.startsWith(THEME_PREFIX) ? previous : 'dark'
-    const { deny } = await $.config.set({ key: 'theme', value: back })
-    return deny ? S.themeKept(deny) : S.themeBack(back)
-  }
-  return ''
-}
-
 async function setLook($: EngineInterface, args: string): Promise<string> {
   const arg = args.trim().toLowerCase()
   if (!arg) return S.lookIs(await storedLook($), paletteOf(await refreshLook($)).name)
   if (!isLookSetting(arg)) return S.lookUnknown(arg)
   await $.store.set(LOOK_KEY, arg)
-  const note = await syncTheme($, arg).catch(() => '')
   const name = paletteOf(await refreshLook($)).name
   await $.ui.open({ id: PANE, title: S.pane }).catch(() => undefined)
-  return S.lookSet(name) + note
+  return S.lookSet(name)
 }
 
 export const register: Register = on => {

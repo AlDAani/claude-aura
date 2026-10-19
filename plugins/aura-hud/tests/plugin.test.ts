@@ -4,7 +4,6 @@ import type { Engine } from 'claude-code/testing'
 const PLUGIN = 'aura-hud'
 const TOOL = 'mcp__aura-hud__progress'
 const PANE = 'aura-agents'
-const CHATGPT = 'custom:aura-themes:chatgpt-dark'
 const SURFACES = ['terminal', 'desktop'] as const
 
 const PROVIDER = { plugin: 'test', tier: 'user' } as const
@@ -98,43 +97,9 @@ test('the panel opens by itself when agents start working, once per batch', asyn
   expect(opened).toEqual([PANE, PANE])
 })
 
-test('/look chatgpt repaints and switches the terminal theme; /look claude puts it back', async ($, on) => {
-  let theme = 'light'
-  mock.clock(on, { now: 1_000 })
-  mock.store(on)
-  on('ui.open', () => PLACED)
-  on('config.list', () => ({
-    value: [
-      {
-        key: 'theme',
-        label: 'Theme',
-        kind: 'choice',
-        value: theme,
-        options: ['dark', 'light', CHATGPT, 'custom:aura-themes:webstorm-islands-dark'],
-        provider: { plugin: 'core', tier: 'core' },
-        isLocked: false,
-      },
-    ],
-  }))
-  on('config.set', (_engine, e) => {
-    if (e.key === 'theme') theme = String(e.value)
-    return { value: e.value }
-  })
-  const look = (args: string) => $.command.run({ ...COMMAND, command: 'look', args })
-  const set = await look('chatgpt')
-  expect(set.text).toContain('ChatGPT Dark')
-  expect(theme).toBe(CHATGPT)
-  const ui = await $.ui.mount({ plugin: PLUGIN, surface: 'desktop', component: 'Pane', requestId: PANE, props: PANE_PROPS })
-  expect(JSON.stringify(await ui.drawn())).toContain('#2f2f2f')
-  await ui.unmount()
-  expect((await look('claude')).text).toContain('back to light')
-  expect(theme).toBe('light')
-  expect((await look('neon')).text).toContain('Unknown look')
-})
-
-test('/look shows the palette in the panel and points to /theme when the session lists no aura theme', async ($, on) => {
+test('/look repaints the panel, opens it to show the palette, and leaves the Claude Code theme alone', async ($, on) => {
   const opened: string[] = []
-  let theme = 'dark'
+  const written: unknown[] = []
   mock.clock(on, { now: 1_000 })
   mock.store(on)
   on('ui.open', (_engine, e) => {
@@ -147,23 +112,26 @@ test('/look shows the palette in the panel and points to /theme when the session
         key: 'theme',
         label: 'Theme',
         kind: 'choice',
-        value: theme,
-        options: ['auto', 'dark', 'light', 'light-daltonized', 'dark-daltonized', 'light-ansi', 'dark-ansi'],
+        value: 'dark',
+        options: ['auto', 'dark', 'light'],
         provider: { plugin: 'engine', tier: 'core' },
         isLocked: false,
       },
     ],
   }))
   on('config.set', (_engine, e) => {
-    theme = String(e.value)
+    written.push(e)
     return { value: e.value }
   })
-  const answer = await $.command.run({ ...COMMAND, command: 'look', args: 'chatgpt' })
-  expect(answer.text).toContain('Panel palette: ChatGPT Dark')
-  expect(answer.text).toContain('pick ChatGPT Dark in /theme')
-  expect(answer.text).not.toContain('Install')
-  expect(theme).toBe('dark')
+  const look = (args: string) => $.command.run({ ...COMMAND, command: 'look', args })
+  expect((await look('chatgpt')).text).toBe('Panel palette: ChatGPT Dark, shown in the agents panel.')
   expect(opened).toEqual([PANE])
+  const ui = await $.ui.mount({ plugin: PLUGIN, surface: 'desktop', component: 'Pane', requestId: PANE, props: PANE_PROPS })
+  expect(JSON.stringify(await ui.drawn())).toContain('#2f2f2f')
+  await ui.unmount()
+  expect((await look('claude')).text).toBe('Panel palette: Claude, shown in the agents panel.')
+  expect((await look('neon')).text).toContain('Unknown look')
+  expect(written).toEqual([])
 })
 
 test('a finished worker stops counting as running', async ($, on) => {

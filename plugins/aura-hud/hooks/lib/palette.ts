@@ -143,13 +143,6 @@ const PALETTES: Readonly<Record<Look, Palette>> = { claude: CLAUDE, chatgpt: CHA
 
 const LOOK_SETTINGS: readonly LookSetting[] = ['auto', 'claude', 'chatgpt', 'webstorm']
 
-export const THEME_PREFIX = 'custom:aura-themes:'
-
-export const THEME_OF: Readonly<Record<'chatgpt' | 'webstorm', string>> = {
-  chatgpt: `${THEME_PREFIX}chatgpt-dark`,
-  webstorm: `${THEME_PREFIX}webstorm-islands-dark`,
-}
-
 export const isLookSetting = (v: string): v is LookSetting => (LOOK_SETTINGS as readonly string[]).includes(v)
 
 export const paletteOf = (id: Look): Palette => PALETTES[id]

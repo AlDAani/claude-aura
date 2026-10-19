@@ -484,8 +484,8 @@ describe('palettes', () => {
   })
 
   test('the Claude Code theme picks the look', () => {
-    expect(lookOfTheme('custom:aura-themes:chatgpt-dark')).toBe('chatgpt')
-    expect(lookOfTheme('custom:aura-themes:webstorm-islands-dark')).toBe('webstorm')
+    expect(lookOfTheme('custom:mine:chatgpt-dark')).toBe('chatgpt')
+    expect(lookOfTheme('custom:mine:webstorm-islands-dark')).toBe('webstorm')
     expect(lookOfTheme('dark')).toBe('claude')
     expect(lookOfTheme(undefined)).toBe('claude')
   })
